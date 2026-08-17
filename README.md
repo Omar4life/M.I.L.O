@@ -1,4 +1,5 @@
-M.I.L.O (My Intelligent Local Organizer)  is an AI-powered file manager that lets you manage your computer's files using natural language.
+# M.I.L.O (My Intelligent Local Organizer)
+M.I.L.O  is an AI-powered file manager that lets you manage your computer's files using natural language.
 
 Instead of manually searching through folders, renaming files, and organizing everything yourself, you can simply tell MILO what you want.
 
