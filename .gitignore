@@ -1,0 +1,20 @@
+# Ignore Python-generated cache files.
+__pycache__/
+
+# Ignore Python compiled files.
+*.pyc
+
+# Ignore Python virtual environments.
+venv/
+.venv/
+
+# Ignore environment variable files that may contain secrets.
+.env
+.env.*
+
+# Ignore VS Code local settings.
+.vscode/
+
+# Ignore operating-system metadata.
+.DS_Store
+Thumbs.db

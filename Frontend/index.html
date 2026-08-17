@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>MILO</title>
+
+    <link rel="stylesheet" href="style.css">
+
+</head>
+
+<body>
+
+    <main class="app">
+
+        <header>
+
+            <h1>M.I.L.O</h1>
+
+            <p>My Intelligent Local Organizer</p>
+
+        </header>
+
+
+        <section class="card">
+
+            <h2>📂 Allowed folders</h2>
+
+            <div class="folder-input">
+
+                <input
+                    id="folderPath"
+                    type="text"
+                    placeholder="C:\Users\You\Downloads"
+                >
+
+                <button id="scanButton">
+                    Scan folder
+                </button>
+
+            </div>
+
+            <p class="privacy">
+                🔒 MILO only scans folders you choose.
+            </p>
+
+        </section>
+
+
+        <section class="card">
+
+            <h2>What do you want MILO to do?</h2>
+
+            <div class="command-box">
+
+                <input
+                    id="commandInput"
+                    type="text"
+                    placeholder="Find my robotics files..."
+                >
+
+                <button id="runButton">
+                    Run
+                </button>
+
+            </div>
+
+        </section>
+
+
+        <section class="card">
+
+            <h2>📁 Files</h2>
+
+            <p id="status">
+                Choose a folder to get started.
+            </p>
+
+            <div id="fileList"></div>
+
+        </section>
+
+    </main>
+
+
+    <script src="app.js"></script>
+
+</body>
+
+</html>
