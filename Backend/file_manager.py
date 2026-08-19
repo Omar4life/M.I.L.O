@@ -1,5 +1,27 @@
 import os
 import re
+import json
+from pypdf import PdfReader
+
+TEXT_EXTENSIONS = {
+    ".txt",
+    ".md",
+    ".py",
+    ".js",
+    ".html",
+    ".css",
+    ".json",
+    ".csv"
+}
+
+DOCUMENT_EXTENSIONS = {
+    ".pdf",
+    ".txt",
+    ".md"
+}
+
+INDEX_FILENAME = ".milo_index.json"
+
 
 def scan_folder(folder_path):
     if not os.path.exists(folder_path):
@@ -11,8 +33,12 @@ def scan_folder(folder_path):
     results = []
 
     for root, folders, files in os.walk(folder_path):
+        if INDEX_FILENAME in files:
+            files.remove(INDEX_FILENAME)
+
         for folder in folders:
             full_path = os.path.join(root, folder)
+
             results.append({
                 "name": folder,
                 "path": full_path,
@@ -21,6 +47,7 @@ def scan_folder(folder_path):
 
         for file in files:
             full_path = os.path.join(root, file)
+
             results.append({
                 "name": file,
                 "path": full_path,
@@ -29,80 +56,415 @@ def scan_folder(folder_path):
 
     return results
 
-def search_files(files, query):
-    query = query.lower()
-    query = query.replace("$", " ")
-    query_words = re.findall(r"[a-zA-Z0-9]+", query)
+
+def read_file_content(file_path):
+    extension = os.path.splitext(file_path)[1].lower()
+
+    if extension == ".pdf":
+        try:
+            reader = PdfReader(file_path)
+            text = ""
+
+            for page in reader.pages:
+                page_text = page.extract_text()
+
+                if page_text:
+                    text += page_text + "\n"
+
+            return text.strip()
+
+        except Exception:
+            return ""
+
+    if extension in TEXT_EXTENSIONS:
+        try:
+            with open(
+                file_path,
+                "r",
+                encoding="utf-8",
+                errors="ignore"
+            ) as file:
+                return file.read()
+
+        except Exception:
+            return ""
+
+    return ""
+
+
+def get_index_path(folder_path):
+    return os.path.join(
+        folder_path,
+        INDEX_FILENAME
+    )
+
+
+def load_index(folder_path):
+    index_path = get_index_path(folder_path)
+
+    if not os.path.exists(index_path):
+        return {}
+
+    try:
+        with open(
+            index_path,
+            "r",
+            encoding="utf-8"
+        ) as file:
+            return json.load(file)
+
+    except Exception:
+        return {}
+
+
+def save_index(folder_path, index):
+    index_path = get_index_path(folder_path)
+
+    with open(
+        index_path,
+        "w",
+        encoding="utf-8"
+    ) as file:
+        json.dump(
+            index,
+            file,
+            ensure_ascii=False,
+            indent=2
+        )
+
+
+def update_index(folder_path):
+    old_index = load_index(
+        folder_path
+    )
+
+    new_index = {}
+
+    for root, folders, files in os.walk(folder_path):
+        for file in files:
+            extension = os.path.splitext(file)[1].lower()
+
+            if extension not in DOCUMENT_EXTENSIONS:
+                continue
+
+            file_path = os.path.join(
+                root,
+                file
+            )
+
+            try:
+                modified_time = os.path.getmtime(
+                    file_path
+                )
+
+                old_entry = old_index.get(
+                    file_path
+                )
+
+                if (
+                    old_entry
+                    and old_entry.get("modified") == modified_time
+                ):
+                    new_index[file_path] = old_entry
+                    continue
+
+                content = read_file_content(
+                    file_path
+                )
+
+                if content:
+                    new_index[file_path] = {
+                        "name": file,
+                        "path": file_path,
+                        "content": content,
+                        "modified": modified_time
+                    }
+
+            except Exception:
+                continue
+
+    save_index(
+        folder_path,
+        new_index
+    )
+
+    return new_index
+
+
+def normalize_text(text):
+    text = text.lower()
+
+    text = text.replace(
+        "spider-man",
+        "spiderman"
+    )
+
+    text = text.replace(
+        "spider man",
+        "spiderman"
+    )
+
+    text = re.sub(
+        r"[^a-z0-9]+",
+        " ",
+        text
+    )
+
+    return text
+
+
+def search_document_contents(
+    folder_path,
+    query,
+    limit=5
+):
+    index = update_index(
+        folder_path
+    )
+
+    query_text = normalize_text(
+        query
+    )
+
+    query_words = query_text.split()
 
     ignored_words = {
+        "find",
+        "show",
+        "get",
+        "look",
+        "search",
+        "for",
         "the",
         "a",
         "an",
         "my",
         "me",
-        "i",
-        "find",
-        "show",
-        "get",
-        "look",
-        "for",
+        "file",
+        "files",
+        "folder",
+        "folders",
+        "thing",
+        "something",
+        "that",
         "where",
-        "can",
-        "could",
-        "would",
+        "about",
+        "with",
+        "which",
+        "document",
+        "whatever",
+        "called",
+        "named",
+        "please",
+        "some",
+        "one",
         "is",
         "are",
         "was",
         "were",
-        "in",
-        "on",
-        "at",
-        "to",
-        "of",
         "and",
         "or",
-        "with",
-        "under",
-        "less",
-        "than"
+        "to",
+        "in",
+        "of",
+        "on",
+        "can",
+        "you",
+        "want",
+        "looking"
     }
 
     useful_words = [
         word
         for word in query_words
         if word not in ignored_words
+        and len(word) >= 3
     ]
 
-    matches = []
+    if not useful_words:
+        return []
+
+    results = []
+
+    for file_path, entry in index.items():
+        content = normalize_text(
+            entry["content"]
+        )
+
+        matched_words = []
+
+        for word in useful_words:
+            pattern = r"\b" + re.escape(word) + r"\b"
+
+            if re.search(
+                pattern,
+                content
+            ):
+                matched_words.append(
+                    word
+                )
+
+        matched_count = len(
+            matched_words
+        )
+
+        total_words = len(
+            useful_words
+        )
+
+        if total_words >= 5:
+            if matched_count < total_words:
+                continue
+        else:
+            if matched_count < 3:
+                continue
+
+        score = matched_count * 100
+
+        if matched_count == total_words:
+            score += 1000
+
+        phrase = " ".join(
+            useful_words
+        )
+
+        if phrase in content:
+            score += 1000
+
+        results.append({
+            "name": entry["name"],
+            "path": entry["path"],
+            "type": "file",
+            "score": score,
+            "matched": matched_count
+        })
+
+    results.sort(
+        key=lambda item: (
+            item["score"],
+            item["matched"]
+        ),
+        reverse=True
+    )
+
+    if not results:
+        return []
+
+    best_score = results[0]["score"]
+
+    strong_results = [
+        result
+        for result in results
+        if result["score"] >= best_score * 0.8
+    ]
+
+    final_results = []
+
+    for result in strong_results[:limit]:
+        final_results.append({
+            "name": result["name"],
+            "path": result["path"],
+            "type": result["type"]
+        })
+
+    return final_results
+
+
+def get_candidate_files(
+    files,
+    query,
+    limit=8
+):
+    query_words = re.findall(
+        r"[a-zA-Z0-9]+",
+        query.lower()
+    )
+
+    ignored_words = {
+        "find",
+        "show",
+        "get",
+        "look",
+        "search",
+        "for",
+        "the",
+        "a",
+        "an",
+        "my",
+        "me",
+        "file",
+        "files",
+        "folder",
+        "folders",
+        "thing",
+        "something",
+        "that",
+        "where",
+        "about",
+        "with",
+        "which",
+        "document",
+        "whatever",
+        "called",
+        "named",
+        "please",
+        "some",
+        "one",
+        "is",
+        "are",
+        "was",
+        "were",
+        "and",
+        "or",
+        "to",
+        "in",
+        "of",
+        "on"
+    }
+
+    useful_words = [
+        word
+        for word in query_words
+        if word not in ignored_words
+        and len(word) >= 3
+    ]
+
+    scored = []
 
     for item in files:
         name = item["name"].lower()
-        normalized_name = name.replace("$", " ")
-        name_words = re.findall(r"[a-zA-Z0-9]+", normalized_name)
+
+        name_without_extension = os.path.splitext(name)[0]
+
+        name_words = re.findall(
+            r"[a-zA-Z0-9]+",
+            name_without_extension
+        )
+
         score = 0
+        matched_words = 0
 
         for word in useful_words:
             if word in name_words:
-                score += 1
-            elif any(word in name_word for name_word in name_words):
-                score += 0.5
+                score += 10
+                matched_words += 1
 
-        if score > 0:
-            result = {
-                "name": item["name"],
-                "path": item["path"],
-                "type": item["type"],
+            elif word in name_without_extension:
+                score += 4
+                matched_words += 1
+
+        if matched_words > 0:
+            scored.append({
+                "item": item,
                 "score": score
-            }
+            })
 
-            matches.append(result)
-
-    matches.sort(
+    scored.sort(
         key=lambda item: item["score"],
         reverse=True
     )
 
-    for item in matches:
-        del item["score"]
-
-    return matches
+    return [
+        item["item"]
+        for item in scored[:limit]
+    ]
