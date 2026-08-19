@@ -1,15 +1,10 @@
 const API_URL = "http://127.0.0.1:8000";
 
 const folderPath = document.getElementById("folderPath");
-
 const scanButton = document.getElementById("scanButton");
-
 const commandInput = document.getElementById("commandInput");
-
 const runButton = document.getElementById("runButton");
-
 const status = document.getElementById("status");
-
 const fileList = document.getElementById("fileList");
 
 async function scanFolder() {
@@ -21,7 +16,6 @@ async function scanFolder() {
     }
 
     status.textContent = "Scanning folder...";
-
     fileList.innerHTML = "";
 
     try {
@@ -38,7 +32,9 @@ async function scanFolder() {
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.detail || "MILO could not scan the folder.");
+            throw new Error(
+                data.detail || "MILO could not scan the folder."
+            );
         }
 
         status.textContent =
@@ -53,7 +49,6 @@ async function scanFolder() {
 
 async function runCommand() {
     const command = commandInput.value.trim();
-
     const folder = folderPath.value.trim();
 
     if (!command) {
@@ -67,7 +62,6 @@ async function runCommand() {
     }
 
     status.textContent = "MILO is thinking...";
-
     fileList.innerHTML = "";
 
     try {
@@ -85,7 +79,9 @@ async function runCommand() {
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.detail || "MILO encountered an error.");
+            throw new Error(
+                data.detail || "MILO encountered an error."
+            );
         }
 
         if (data.action === "SEARCH") {
@@ -94,19 +90,60 @@ async function runCommand() {
 
             displayFiles(data.results);
 
-        } else {
-            status.textContent =
-                data.message || "MILO does not support that action yet.";
+            return;
         }
+
+        if (data.action === "QUESTION") {
+            status.textContent = "MILO found an answer:";
+
+            displayAnswer(
+                data.answer,
+                data.file
+            );
+
+            return;
+        }
+
+        status.textContent =
+            data.message || "MILO does not support that action yet.";
 
     } catch (error) {
         status.textContent = `Error: ${error.message}`;
     }
 }
 
+function displayAnswer(answer, file) {
+    const answerElement = document.createElement("div");
+
+    answerElement.className = "answer";
+
+    answerElement.innerHTML = `
+        <div class="answer-text">
+            ${escapeHTML(answer)}
+        </div>
+        ${
+            file
+                ? `
+                    <div class="answer-file">
+                        <div class="file-name">
+                            📄 ${escapeHTML(file.name)}
+                        </div>
+                        <div class="file-path">
+                            ${escapeHTML(file.path)}
+                        </div>
+                    </div>
+                `
+                : ""
+        }
+    `;
+
+    fileList.appendChild(answerElement);
+}
+
 function displayFiles(files) {
     if (files.length === 0) {
-        fileList.innerHTML = "<p>No matching files or folders found.</p>";
+        fileList.innerHTML =
+            "<p>No matching files or folders found.</p>";
         return;
     }
 
@@ -115,7 +152,10 @@ function displayFiles(files) {
 
         element.className = "file-item";
 
-        const icon = item.type === "folder" ? "📁" : "📄";
+        const icon =
+            item.type === "folder"
+                ? "📁"
+                : "📄";
 
         element.innerHTML = `
             <div>
@@ -141,18 +181,30 @@ function escapeHTML(value) {
         .replaceAll("'", "&#039;");
 }
 
-scanButton.addEventListener("click", scanFolder);
+scanButton.addEventListener(
+    "click",
+    scanFolder
+);
 
-folderPath.addEventListener("keydown", event => {
-    if (event.key === "Enter") {
-        scanFolder();
+folderPath.addEventListener(
+    "keydown",
+    event => {
+        if (event.key === "Enter") {
+            scanFolder();
+        }
     }
-});
+);
 
-runButton.addEventListener("click", runCommand);
+runButton.addEventListener(
+    "click",
+    runCommand
+);
 
-commandInput.addEventListener("keydown", event => {
-    if (event.key === "Enter") {
-        runCommand();
+commandInput.addEventListener(
+    "keydown",
+    event => {
+        if (event.key === "Enter") {
+            runCommand();
+        }
     }
-});
+);
