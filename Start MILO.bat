@@ -14,10 +14,10 @@ echo.
 
 echo [1/6] Checking Python...
 
-where python >nul 2>&1
+python --version >nul 2>&1
 
 if %errorlevel% neq 0 (
-    echo Python is not installed.
+    echo Python is not installed correctly.
     echo Installing Python 3.11...
     echo.
 
@@ -32,21 +32,24 @@ if %errorlevel% neq 0 (
     )
 
     echo.
-    echo Python installed.
+    echo Python was installed.
     echo Please close this window and run Start MILO.bat again.
+    echo.
     pause
     exit /b 0
 )
 
-echo Python found.
+for /f "tokens=2" %%A in ('python --version 2^>^&1') do set PYTHON_VERSION=%%A
+
+echo Python %PYTHON_VERSION% found.
 
 echo.
 echo [2/6] Checking Ollama...
 
-where ollama >nul 2>&1
+ollama --version >nul 2>&1
 
 if %errorlevel% neq 0 (
-    echo Ollama is not installed.
+    echo Ollama is not installed correctly.
     echo Installing Ollama...
     echo.
 
@@ -61,8 +64,9 @@ if %errorlevel% neq 0 (
     )
 
     echo.
-    echo Ollama installed.
+    echo Ollama was installed.
     echo Please close this window and run Start MILO.bat again.
+    echo.
     pause
     exit /b 0
 )
@@ -79,6 +83,14 @@ if %errorlevel% neq 0 (
     echo.
 
     python -m pip install --upgrade pip
+
+    if %errorlevel% neq 0 (
+        echo.
+        echo ERROR: Could not access pip.
+        pause
+        exit /b 1
+    )
+
     python -m pip install -r Backend\requirements.txt
 
     if %errorlevel% neq 0 (
@@ -134,7 +146,6 @@ echo ==========================================
 echo.
 echo Backend: http://127.0.0.1:8000
 echo.
-echo You can close this window.
 echo Keep the MILO Backend window open.
 echo.
 
