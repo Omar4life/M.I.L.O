@@ -2,33 +2,33 @@
 <html lang="en">
 
 <head>
-
     <meta charset="UTF-8">
-
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>MILO</title>
 
     <link rel="stylesheet" href="style.css">
-
 </head>
 
 <body>
 
     <main class="app">
 
-        <header>
+        <header class="header">
 
-            <h1>M.I.L.O</h1>
-
-            <p>My Intelligent Local Organizer</p>
+            <div>
+                <h1>M.I.L.O</h1>
+                <p>My Intelligent Local Organizer</p>
+            </div>
 
         </header>
 
 
-        <section class="card">
+        <section class="card folder-card">
 
-            <h2>📂 Allowed folders</h2>
+            <div class="section-title">
+                <h2>📂 Allowed folder</h2>
+            </div>
 
             <div class="folder-input">
 
@@ -39,7 +39,7 @@
                 >
 
                 <button id="scanButton">
-                    Scan folder
+                    Scan
                 </button>
 
             </div>
@@ -51,36 +51,133 @@
         </section>
 
 
-        <section class="card">
+        <section class="chat-card">
 
-            <h2>What do you want MILO to do?</h2>
+            <div class="chat-header">
 
-            <div class="command-box">
+                <div>
+                    <h2>MILO</h2>
+                    <p>Ask me anything about your files</p>
+                </div>
 
-                <input
-                    id="commandInput"
-                    type="text"
-                    placeholder="Find my robotics files..."
-                >
+                <div class="chat-actions">
 
-                <button id="runButton">
-                    Run
-                </button>
+                    <button
+                        id="newChatButton"
+                        class="new-chat-button"
+                    >
+                        + New chat
+                    </button>
+
+                    <button
+                        id="historyButton"
+                        class="history-button"
+                    >
+                        ☰
+                    </button>
+
+                </div>
 
             </div>
 
-        </section>
+
+            <div
+                id="chatSidebar"
+                class="chat-sidebar"
+            >
+
+                <div class="sidebar-header">
+
+                    <strong>Previous chats</strong>
+
+                    <button
+                        id="closeSidebarButton"
+                        class="close-sidebar"
+                    >
+                        ×
+                    </button>
+
+                </div>
+
+                <div
+                    id="chatList"
+                    class="chat-list"
+                ></div>
+
+            </div>
 
 
-        <section class="card">
+            <div
+                id="messages"
+                class="messages"
+            >
 
-            <h2>📁 Files</h2>
+                <div class="welcome">
 
-            <p id="status">
-                Choose a folder to get started.
-            </p>
+                    <div class="welcome-icon">
+                        M
+                    </div>
 
-            <div id="fileList"></div>
+                    <h3>
+                        What can I help you find?
+                    </h3>
+
+                    <p>
+                        Ask MILO to find or read something from your allowed folder.
+                    </p>
+
+                    <div class="suggestions">
+
+                        <button class="suggestion">
+                            Find my robotics files
+                        </button>
+
+                        <button class="suggestion">
+                            Find my Spider-Man ticket
+                        </button>
+
+                        <button class="suggestion">
+                            Find my AI tools documents
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div
+                id="status"
+                class="status"
+            ></div>
+
+
+            <div class="input-area">
+
+                <div class="command-box">
+
+                    <input
+                        id="commandInput"
+                        type="text"
+                        placeholder="Ask MILO what to do..."
+                        autocomplete="off"
+                    >
+
+                    <button
+                        id="runButton"
+                        class="send-button"
+                    >
+                        ↑
+                    </button>
+
+                </div>
+
+                <p class="input-hint">
+                    MILO searches only the folder you allow.
+                </p>
+
+            </div>
 
         </section>
 

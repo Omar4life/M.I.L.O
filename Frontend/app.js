@@ -5,181 +5,428 @@ const scanButton = document.getElementById("scanButton");
 const commandInput = document.getElementById("commandInput");
 const runButton = document.getElementById("runButton");
 const status = document.getElementById("status");
-const fileList = document.getElementById("fileList");
+const messages = document.getElementById("messages");
+const chatList = document.getElementById("chatList");
+const newChatButton = document.getElementById("newChatButton");
+
+let chats = JSON.parse(
+    localStorage.getItem("miloChats") || "[]"
+);
+
+let currentChatId = null;
+
+function saveChats() {
+    localStorage.setItem(
+        "miloChats",
+        JSON.stringify(chats)
+    );
+}
+
+function createChat() {
+    const chat = {
+        id: Date.now().toString(),
+        title: "New chat",
+        messages: []
+    };
+
+    chats.unshift(chat);
+    currentChatId = chat.id;
+
+    saveChats();
+    renderChatList();
+    renderCurrentChat();
+}
+
+function getCurrentChat() {
+    return chats.find(
+        chat => chat.id === currentChatId
+    );
+}
+
+function renderChatList() {
+    chatList.innerHTML = "";
+
+    chats.forEach(chat => {
+        const button = document.createElement("button");
+
+        button.className = "chat-item";
+
+        if (chat.id === currentChatId) {
+            button.classList.add("active");
+        }
+
+        button.textContent = chat.title;
+
+        button.addEventListener(
+            "click",
+            () => {
+                currentChatId = chat.id;
+                renderChatList();
+                renderCurrentChat();
+            }
+        );
+
+        chatList.appendChild(button);
+    });
+}
+
+function renderCurrentChat() {
+    const chat = getCurrentChat();
+
+    if (!chat || chat.messages.length === 0) {
+        messages.innerHTML = `
+            <div class="welcome">
+
+                <div class="welcome-logo">
+                    M
+                </div>
+
+                <h2>What can I help you find?</h2>
+
+                <p>
+                    Ask MILO to find, read, or organize something on your computer.
+                </p>
+
+                <div class="suggestions">
+
+                    <button class="suggestion">
+                        Find my robotics files
+                    </button>
+
+                    <button class="suggestion">
+                        Find my Spider-Man ticket
+                    </button>
+
+                    <button class="suggestion">
+                        Find my AI tools documents
+                    </button>
+
+                </div>
+
+            </div>
+        `;
+
+        attachSuggestions();
+        return;
+    }
+
+    messages.innerHTML = "";
+
+    chat.messages.forEach(message => {
+        renderMessage(
+            message.role,
+            message.text,
+            message.results || []
+        );
+    });
+
+    scrollToBottom();
+}
+
+function renderMessage(role, text, results = []) {
+    const wrapper = document.createElement("div");
+
+    wrapper.className =
+        `message ${role}`;
+
+    const label = document.createElement("div");
+
+    label.className = "message-label";
+
+    label.textContent =
+        role === "user"
+            ? "You"
+            : "MILO";
+
+    const bubble = document.createElement("div");
+
+    bubble.className = "message-bubble";
+
+    bubble.textContent = text;
+
+    wrapper.appendChild(label);
+    wrapper.appendChild(bubble);
+
+    if (results.length > 0) {
+        results.forEach(item => {
+            const result = document.createElement("div");
+
+            result.className = "result";
+
+            result.innerHTML = `
+                <div class="result-name">
+                    ${item.type === "folder" ? "📁" : "📄"}
+                    ${escapeHTML(item.name)}
+                </div>
+                <div class="result-path">
+                    ${escapeHTML(item.path)}
+                </div>
+            `;
+
+            wrapper.appendChild(result);
+        });
+    }
+
+    messages.appendChild(wrapper);
+}
+
+function addMessage(role, text, results = []) {
+    const chat = getCurrentChat();
+
+    if (!chat) {
+        createChat();
+        return addMessage(
+            role,
+            text,
+            results
+        );
+    }
+
+    chat.messages.push({
+        role,
+        text,
+        results
+    });
+
+    if (
+        role === "user" &&
+        chat.title === "New chat"
+    ) {
+        chat.title = makeChatTitle(text);
+    }
+
+    saveChats();
+    renderChatList();
+    renderCurrentChat();
+}
+
+function makeChatTitle(text) {
+    const cleaned = text
+        .replace(/[.!?]/g, "")
+        .trim();
+
+    if (!cleaned) {
+        return "New chat";
+    }
+
+    const words = cleaned.split(/\s+/);
+
+    if (words.length <= 5) {
+        return cleaned;
+    }
+
+    return words
+        .slice(0, 5)
+        .join(" ") + "...";
+}
 
 async function scanFolder() {
     const path = folderPath.value.trim();
 
     if (!path) {
-        status.textContent = "Please enter a folder path.";
+        status.textContent =
+            "Please enter a folder path.";
+
         return;
     }
 
-    status.textContent = "Scanning folder...";
-    fileList.innerHTML = "";
+    status.textContent =
+        "Scanning folder...";
 
     try {
-        const response = await fetch(`${API_URL}/scan`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                path: path
-            })
-        });
+        const response = await fetch(
+            `${API_URL}/scan`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    path
+                })
+            }
+        );
 
         const data = await response.json();
 
         if (!response.ok) {
             throw new Error(
-                data.detail || "MILO could not scan the folder."
+                data.detail ||
+                "MILO could not scan the folder."
             );
         }
 
         status.textContent =
             `Found ${data.files.length} files and folders.`;
 
-        displayFiles(data.files);
-
     } catch (error) {
-        status.textContent = `Error: ${error.message}`;
+        status.textContent =
+            `Error: ${error.message}`;
     }
 }
 
 async function runCommand() {
-    const command = commandInput.value.trim();
-    const folder = folderPath.value.trim();
+    const command =
+        commandInput.value.trim();
+
+    const folder =
+        folderPath.value.trim();
 
     if (!command) {
-        status.textContent = "Tell MILO what you want it to do.";
         return;
     }
 
     if (!folder) {
-        status.textContent = "Choose a folder first.";
+        status.textContent =
+            "Choose a folder first.";
+
         return;
     }
 
-    status.textContent = "MILO is thinking...";
-    fileList.innerHTML = "";
+    if (!currentChatId) {
+        createChat();
+    }
+
+    addMessage(
+        "user",
+        command
+    );
+
+    commandInput.value = "";
+
+    status.textContent =
+        "MILO is thinking...";
 
     try {
-        const response = await fetch(`${API_URL}/command`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                command: command,
-                folder: folder
-            })
-        });
+        const response = await fetch(
+            `${API_URL}/command`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    command,
+                    folder
+                })
+            }
+        );
 
         const data = await response.json();
 
         if (!response.ok) {
             throw new Error(
-                data.detail || "MILO encountered an error."
+                data.detail ||
+                "MILO encountered an error."
             );
         }
 
         if (data.action === "SEARCH") {
-            status.textContent =
-                `MILO searched for "${data.query}" and found ${data.results.length} results.`;
 
-            displayFiles(data.results);
+            const results =
+                data.results || [];
 
-            return;
-        }
+            if (results.length === 0) {
+                addMessage(
+                    "milo",
+                    "I couldn't find anything matching that.",
+                    []
+                );
+            } else {
+                addMessage(
+                    "milo",
+                    `I found ${results.length} matching result${results.length === 1 ? "" : "s"}.`,
+                    results
+                );
+            }
 
-        if (data.action === "QUESTION") {
-            status.textContent = "MILO found an answer:";
+        } else if (data.action === "QUESTION") {
 
-            displayAnswer(
-                data.answer,
-                data.file
+            addMessage(
+                "milo",
+                data.answer ||
+                "I couldn't answer that.",
+                []
             );
 
-            return;
+        } else {
+
+            addMessage(
+                "milo",
+                data.message ||
+                "I don't support that yet.",
+                []
+            );
         }
 
-        status.textContent =
-            data.message || "MILO does not support that action yet.";
+        status.textContent = "";
 
     } catch (error) {
-        status.textContent = `Error: ${error.message}`;
+
+        addMessage(
+            "milo",
+            `Something went wrong: ${error.message}`,
+            []
+        );
+
+        status.textContent = "";
     }
 }
 
-function displayAnswer(answer, file) {
-    const answerElement = document.createElement("div");
+function attachSuggestions() {
+    document
+        .querySelectorAll(".suggestion")
+        .forEach(button => {
 
-    answerElement.className = "answer";
+            button.addEventListener(
+                "click",
+                () => {
+                    commandInput.value =
+                        button.textContent.trim();
 
-    answerElement.innerHTML = `
-        <div class="answer-text">
-            ${escapeHTML(answer)}
-        </div>
-        ${
-            file
-                ? `
-                    <div class="answer-file">
-                        <div class="file-name">
-                            📄 ${escapeHTML(file.name)}
-                        </div>
-                        <div class="file-path">
-                            ${escapeHTML(file.path)}
-                        </div>
-                    </div>
-                `
-                : ""
-        }
-    `;
+                    commandInput.focus();
+                }
+            );
 
-    fileList.appendChild(answerElement);
+        });
 }
 
-function displayFiles(files) {
-    if (files.length === 0) {
-        fileList.innerHTML =
-            "<p>No matching files or folders found.</p>";
-        return;
-    }
-
-    files.forEach(item => {
-        const element = document.createElement("div");
-
-        element.className = "file-item";
-
-        const icon =
-            item.type === "folder"
-                ? "📁"
-                : "📄";
-
-        element.innerHTML = `
-            <div>
-                <div class="file-name">
-                    ${icon} ${escapeHTML(item.name)}
-                </div>
-                <div class="file-path">
-                    ${escapeHTML(item.path)}
-                </div>
-            </div>
-        `;
-
-        fileList.appendChild(element);
-    });
+function scrollToBottom() {
+    messages.scrollTop =
+        messages.scrollHeight;
 }
 
 function escapeHTML(value) {
     return String(value)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
+        .replaceAll(
+            "&",
+            "&amp;"
+        )
+        .replaceAll(
+            "<",
+            "&lt;"
+        )
+        .replaceAll(
+            ">",
+            "&gt;"
+        )
+        .replaceAll(
+            '"',
+            "&quot;"
+        )
+        .replaceAll(
+            "'",
+            "&#039;"
+        );
 }
+
+newChatButton.addEventListener(
+    "click",
+    () => {
+        createChat();
+        commandInput.focus();
+    }
+);
 
 scanButton.addEventListener(
     "click",
@@ -208,3 +455,25 @@ commandInput.addEventListener(
         }
     }
 );
+
+if (chats.length === 0) {
+    createChat();
+} else {
+    currentChatId = chats[0].id;
+    renderChatList();
+    renderCurrentChat();
+}
+
+attachSuggestions();
+
+const historyButton = document.getElementById("historyButton");
+const closeSidebarButton = document.getElementById("closeSidebarButton");
+const chatSidebar = document.getElementById("chatSidebar");
+
+historyButton.addEventListener("click", () => {
+    chatSidebar.classList.add("open");
+});
+
+closeSidebarButton.addEventListener("click", () => {
+    chatSidebar.classList.remove("open");
+});
