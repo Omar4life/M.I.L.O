@@ -34,7 +34,6 @@ if %errorlevel% neq 0 (
     echo.
     echo Python was installed.
     echo Please close this window and run Start MILO.bat again.
-    echo.
     pause
     exit /b 0
 )
@@ -66,7 +65,6 @@ if %errorlevel% neq 0 (
     echo.
     echo Ollama was installed.
     echo Please close this window and run Start MILO.bat again.
-    echo.
     pause
     exit /b 0
 )
@@ -79,23 +77,19 @@ echo [3/6] Checking Python dependencies...
 python -c "import fastapi, uvicorn, pydantic, ollama, pypdf" >nul 2>&1
 
 if %errorlevel% neq 0 (
-    echo Installing MILO dependencies...
+    echo MILO dependencies are missing.
+    echo Installing dependencies...
     echo.
 
-    python -m pip install --upgrade pip
+    python -m pip install -r Backend\requirements.txt --trusted-host pypi.org --trusted-host files.pythonhosted.org
 
     if %errorlevel% neq 0 (
         echo.
-        echo ERROR: Could not access pip.
-        pause
-        exit /b 1
-    )
-
-    python -m pip install -r Backend\requirements.txt
-
-    if %errorlevel% neq 0 (
+        echo ERROR: Failed to install MILO dependencies.
         echo.
-        echo ERROR: Failed to install Python dependencies.
+        echo If this keeps happening, your network may be blocking
+        echo Python package downloads.
+        echo.
         pause
         exit /b 1
     )
