@@ -617,3 +617,4 @@ def get_candidate_files(
         item["item"]
         for item in scored[:limit]
     ]
+
