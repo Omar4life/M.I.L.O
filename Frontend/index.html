@@ -10,83 +10,146 @@
 
 <body>
 
-    <main class="app">
+    <div class="app-layout">
 
-        <header>
-            <div>
+        <aside class="sidebar">
+
+            <div class="sidebar-header">
                 <h1>M.I.L.O</h1>
                 <p>My Intelligent Local Organizer</p>
             </div>
 
-            <a
-                class="download-button"
-                href="https://github.com/Omar4life/M.I.L.O/releases/download/v1.0.0/MILO-Stardance-Demo.zip"
-                download
-            >
-                Download MILO
-            </a>
-        </header>
+            <button id="newChatButton" class="new-chat-button">
+                + New Chat
+            </button>
 
-        <section class="card">
-
-            <h2>📂 Allowed folders</h2>
-
-            <div class="folder-input">
-
-                <input
-                    id="folderPath"
-                    type="text"
-                    placeholder="C:\Users\You\Downloads"
-                >
-
-                <button id="scanButton">
-                    Scan folder
-                </button>
-
+            <div class="chat-history-section">
+                <h3>Previous chats</h3>
+                <div id="chatHistory"></div>
             </div>
 
-            <p class="privacy">
-                🔒 MILO only scans folders you choose.
-            </p>
-
-        </section>
-
-        <section class="card">
-
-            <h2>💬 Chat with MILO</h2>
-
-            <div id="chatMessages" class="chat-messages"></div>
-
-            <div class="command-box">
-
-                <input
-                    id="commandInput"
-                    type="text"
-                    placeholder="Ask MILO anything about your files..."
-                    autocomplete="off"
+            <div class="sidebar-bottom">
+                <a
+                    class="download-button"
+                    href="https://github.com/Omar4life/M.I.L.O/releases/download/v1.0.0/MILO-Stardance-Demo.zip"
+                    download
                 >
-
-                <button id="runButton">
-                    Send
-                </button>
-
+                    ↓ Download MILO
+                </a>
             </div>
 
-        </section>
+        </aside>
 
-        <section class="card">
 
-            <h2>📁 Files</h2>
+        <main class="main-content">
 
-            <p id="status">
-                Choose a folder to get started.
-            </p>
+            <header class="topbar">
 
-            <div id="fileList"></div>
+                <div>
+                    <h2>MILO</h2>
+                    <p id="currentChatTitle">New chat</p>
+                </div>
 
-        </section>
+            </header>
 
-    </main>
+
+            <section class="folder-card">
+
+                <div class="folder-title">
+                    <div>
+                        <h3>📂 Allowed folders</h3>
+                        <p>Choose where MILO is allowed to look.</p>
+                    </div>
+                </div>
+
+                <div class="folder-input">
+
+                    <input
+                        id="folderPath"
+                        type="text"
+                        placeholder="C:\Users\You\Downloads"
+                    >
+
+                    <button id="scanButton">
+                        Scan
+                    </button>
+
+                </div>
+
+                <p class="privacy">
+                    🔒 MILO only scans folders you choose.
+                </p>
+
+            </section>
+
+
+            <section class="chat-container">
+
+                <div id="chatMessages" class="chat-messages">
+
+                    <div class="welcome-message">
+                        <div class="welcome-icon">✦</div>
+
+                        <h2>What can I help you find?</h2>
+
+                        <p>
+                            Ask MILO about files, folders, documents,
+                            or anything inside your selected folder.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="chat-input-area">
+
+                    <div class="command-box">
+
+                        <input
+                            id="commandInput"
+                            type="text"
+                            placeholder="Ask MILO anything..."
+                            autocomplete="off"
+                        >
+
+                        <button id="runButton">
+                            ↑
+                        </button>
+
+                    </div>
+
+                    <p class="input-hint">
+                        Press Enter to send
+                    </p>
+
+                </div>
+
+            </section>
+
+
+            <section class="files-card">
+
+                <div class="files-header">
+
+                    <div>
+                        <h3>📁 Files</h3>
+
+                        <p id="status">
+                            Choose a folder to get started.
+                        </p>
+                    </div>
+
+                </div>
+
+                <div id="fileList"></div>
+
+            </section>
+
+        </main>
+
+    </div>
+
 
     <script src="app.js"></script>
 

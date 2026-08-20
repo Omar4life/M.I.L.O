@@ -5,9 +5,11 @@ const scanButton = document.getElementById("scanButton");
 const commandInput = document.getElementById("commandInput");
 const runButton = document.getElementById("runButton");
 const status = document.getElementById("status");
-const messages = document.getElementById("messages");
-const chatList = document.getElementById("chatList");
+
+const messages = document.getElementById("chatMessages");
+const chatList = document.getElementById("chatHistory");
 const newChatButton = document.getElementById("newChatButton");
+const currentChatTitle = document.getElementById("currentChatTitle");
 
 let chats = JSON.parse(
     localStorage.getItem("miloChats") || "[]"
@@ -15,12 +17,14 @@ let chats = JSON.parse(
 
 let currentChatId = null;
 
+
 function saveChats() {
     localStorage.setItem(
         "miloChats",
         JSON.stringify(chats)
     );
 }
+
 
 function createChat() {
     const chat = {
@@ -30,12 +34,15 @@ function createChat() {
     };
 
     chats.unshift(chat);
+
     currentChatId = chat.id;
 
     saveChats();
+
     renderChatList();
     renderCurrentChat();
 }
+
 
 function getCurrentChat() {
     return chats.find(
@@ -43,48 +50,67 @@ function getCurrentChat() {
     );
 }
 
+
 function renderChatList() {
     chatList.innerHTML = "";
 
     chats.forEach(chat => {
-        const button = document.createElement("button");
 
-        button.className = "chat-item";
+        const item = document.createElement("div");
+
+        item.className = "chat-history-item";
 
         if (chat.id === currentChatId) {
-            button.classList.add("active");
+            item.classList.add("active");
         }
 
-        button.textContent = chat.title;
+        item.textContent = chat.title;
 
-        button.addEventListener(
+        item.addEventListener(
             "click",
             () => {
+
                 currentChatId = chat.id;
+
                 renderChatList();
                 renderCurrentChat();
+
+                commandInput.focus();
             }
         );
 
-        chatList.appendChild(button);
+        chatList.appendChild(item);
     });
 }
 
+
 function renderCurrentChat() {
+
     const chat = getCurrentChat();
 
-    if (!chat || chat.messages.length === 0) {
-        messages.innerHTML = `
-            <div class="welcome">
+    if (!chat) {
+        return;
+    }
 
-                <div class="welcome-logo">
-                    M
+    currentChatTitle.textContent =
+        chat.title;
+
+    if (chat.messages.length === 0) {
+
+        messages.innerHTML = `
+            <div class="welcome-message">
+
+                <div class="welcome-icon">
+                    ✦
                 </div>
 
-                <h2>What can I help you find?</h2>
+                <h2>
+                    What can I help you find?
+                </h2>
 
                 <p>
-                    Ask MILO to find, read, or organize something on your computer.
+                    Ask MILO to find, read, or organize
+                    something on your computer.
                 </p>
 
                 <div class="suggestions">
@@ -107,79 +133,99 @@ function renderCurrentChat() {
         `;
 
         attachSuggestions();
+
         return;
     }
 
     messages.innerHTML = "";
 
     chat.messages.forEach(message => {
+
         renderMessage(
             message.role,
             message.text,
             message.results || []
         );
+
     });
 
     scrollToBottom();
 }
 
-function renderMessage(role, text, results = []) {
-    const wrapper = document.createElement("div");
+
+function renderMessage(
+    role,
+    text,
+    results = []
+) {
+
+    const wrapper =
+        document.createElement("div");
 
     wrapper.className =
         `message ${role}`;
 
-    const label = document.createElement("div");
+    const bubble =
+        document.createElement("div");
 
-    label.className = "message-label";
+    bubble.className =
+        "message-content";
 
-    label.textContent =
-        role === "user"
-            ? "You"
-            : "MILO";
+    bubble.textContent =
+        text;
 
-    const bubble = document.createElement("div");
-
-    bubble.className = "message-bubble";
-
-    bubble.textContent = text;
-
-    wrapper.appendChild(label);
-    wrapper.appendChild(bubble);
+    wrapper.appendChild(
+        bubble
+    );
 
     if (results.length > 0) {
-        results.forEach(item => {
-            const result = document.createElement("div");
 
-            result.className = "result";
+        results.forEach(item => {
+
+            const result =
+                document.createElement("div");
+
+            result.className =
+                "result";
 
             result.innerHTML = `
                 <div class="result-name">
                     ${item.type === "folder" ? "📁" : "📄"}
                     ${escapeHTML(item.name)}
                 </div>
+
                 <div class="result-path">
                     ${escapeHTML(item.path)}
                 </div>
             `;
 
-            wrapper.appendChild(result);
+            wrapper.appendChild(
+                result
+            );
         });
     }
 
-    messages.appendChild(wrapper);
+    messages.appendChild(
+        wrapper
+    );
 }
 
-function addMessage(role, text, results = []) {
-    const chat = getCurrentChat();
+
+function addMessage(
+    role,
+    text,
+    results = []
+) {
+
+    let chat =
+        getCurrentChat();
 
     if (!chat) {
+
         createChat();
-        return addMessage(
-            role,
-            text,
-            results
-        );
+
+        chat =
+            getCurrentChat();
     }
 
     chat.messages.push({
@@ -192,38 +238,52 @@ function addMessage(role, text, results = []) {
         role === "user" &&
         chat.title === "New chat"
     ) {
-        chat.title = makeChatTitle(text);
+
+        chat.title =
+            makeChatTitle(text);
     }
 
     saveChats();
+
     renderChatList();
     renderCurrentChat();
 }
 
+
 function makeChatTitle(text) {
-    const cleaned = text
-        .replace(/[.!?]/g, "")
-        .trim();
+
+    const cleaned =
+        text
+            .replace(/[.!?]/g, "")
+            .trim();
 
     if (!cleaned) {
         return "New chat";
     }
 
-    const words = cleaned.split(/\s+/);
+    const words =
+        cleaned.split(/\s+/);
 
     if (words.length <= 5) {
         return cleaned;
     }
 
-    return words
-        .slice(0, 5)
-        .join(" ") + "...";
+    return (
+        words
+            .slice(0, 5)
+            .join(" ") +
+        "..."
+    );
 }
 
+
 async function scanFolder() {
-    const path = folderPath.value.trim();
+
+    const path =
+        folderPath.value.trim();
 
     if (!path) {
+
         status.textContent =
             "Please enter a folder path.";
 
@@ -234,22 +294,29 @@ async function scanFolder() {
         "Scanning folder...";
 
     try {
-        const response = await fetch(
-            `${API_URL}/scan`,
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    path
-                })
-            }
-        );
 
-        const data = await response.json();
+        const response =
+            await fetch(
+                `${API_URL}/scan`,
+                {
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body: JSON.stringify({
+                        path
+                    })
+                }
+            );
+
+        const data =
+            await response.json();
 
         if (!response.ok) {
+
             throw new Error(
                 data.detail ||
                 "MILO could not scan the folder."
@@ -260,12 +327,15 @@ async function scanFolder() {
             `Found ${data.files.length} files and folders.`;
 
     } catch (error) {
+
         status.textContent =
             `Error: ${error.message}`;
     }
 }
 
+
 async function runCommand() {
+
     const command =
         commandInput.value.trim();
 
@@ -277,6 +347,7 @@ async function runCommand() {
     }
 
     if (!folder) {
+
         status.textContent =
             "Choose a folder first.";
 
@@ -298,28 +369,36 @@ async function runCommand() {
         "MILO is thinking...";
 
     try {
-        const response = await fetch(
-            `${API_URL}/command`,
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    command,
-                    folder
-                })
-            }
-        );
 
-        const data = await response.json();
+        const response =
+            await fetch(
+                `${API_URL}/command`,
+                {
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body: JSON.stringify({
+                        command,
+                        folder
+                    })
+                }
+            );
+
+        const data =
+            await response.json();
 
         if (!response.ok) {
+
             throw new Error(
                 data.detail ||
                 "MILO encountered an error."
             );
         }
+
 
         if (data.action === "SEARCH") {
 
@@ -327,12 +406,14 @@ async function runCommand() {
                 data.results || [];
 
             if (results.length === 0) {
+
                 addMessage(
                     "milo",
-                    "I couldn't find anything matching that.",
-                    []
+                    "I couldn't find anything matching that."
                 );
+
             } else {
+
                 addMessage(
                     "milo",
                     `I found ${results.length} matching result${results.length === 1 ? "" : "s"}.`,
@@ -340,22 +421,22 @@ async function runCommand() {
                 );
             }
 
+
         } else if (data.action === "QUESTION") {
 
             addMessage(
                 "milo",
                 data.answer ||
-                "I couldn't answer that.",
-                []
+                "I couldn't answer that."
             );
+
 
         } else {
 
             addMessage(
                 "milo",
                 data.message ||
-                "I don't support that yet.",
-                []
+                "I don't support that yet."
             );
         }
 
@@ -365,15 +446,16 @@ async function runCommand() {
 
         addMessage(
             "milo",
-            `Something went wrong: ${error.message}`,
-            []
+            `Something went wrong: ${error.message}`
         );
 
         status.textContent = "";
     }
 }
 
+
 function attachSuggestions() {
+
     document
         .querySelectorAll(".suggestion")
         .forEach(button => {
@@ -381,6 +463,7 @@ function attachSuggestions() {
             button.addEventListener(
                 "click",
                 () => {
+
                     commandInput.value =
                         button.textContent.trim();
 
@@ -391,12 +474,16 @@ function attachSuggestions() {
         });
 }
 
+
 function scrollToBottom() {
+
     messages.scrollTop =
         messages.scrollHeight;
 }
 
+
 function escapeHTML(value) {
+
     return String(value)
         .replaceAll(
             "&",
@@ -420,60 +507,63 @@ function escapeHTML(value) {
         );
 }
 
+
 newChatButton.addEventListener(
     "click",
     () => {
+
         createChat();
+
         commandInput.focus();
     }
 );
+
 
 scanButton.addEventListener(
     "click",
     scanFolder
 );
 
+
 folderPath.addEventListener(
     "keydown",
     event => {
+
         if (event.key === "Enter") {
             scanFolder();
         }
+
     }
 );
+
 
 runButton.addEventListener(
     "click",
     runCommand
 );
 
+
 commandInput.addEventListener(
     "keydown",
     event => {
+
         if (event.key === "Enter") {
             runCommand();
         }
+
     }
 );
 
+
 if (chats.length === 0) {
+
     createChat();
+
 } else {
-    currentChatId = chats[0].id;
+
+    currentChatId =
+        chats[0].id;
+
     renderChatList();
     renderCurrentChat();
 }
-
-attachSuggestions();
-
-const historyButton = document.getElementById("historyButton");
-const closeSidebarButton = document.getElementById("closeSidebarButton");
-const chatSidebar = document.getElementById("chatSidebar");
-
-historyButton.addEventListener("click", () => {
-    chatSidebar.classList.add("open");
-});
-
-closeSidebarButton.addEventListener("click", () => {
-    chatSidebar.classList.remove("open");
-});
