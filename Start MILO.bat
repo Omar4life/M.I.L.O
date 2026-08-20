@@ -87,9 +87,6 @@ if %errorlevel% neq 0 (
         echo.
         echo ERROR: Failed to install MILO dependencies.
         echo.
-        echo If this keeps happening, your network may be blocking
-        echo Python package downloads.
-        echo.
         pause
         exit /b 1
     )
@@ -110,13 +107,23 @@ if %errorlevel% neq 0 (
 
     ollama pull qwen3:8b
 
+    echo.
+    echo Verifying AI model...
+
+    ollama list | findstr /C:"qwen3:8b" >nul 2>&1
+
     if %errorlevel% neq 0 (
         echo.
-        echo ERROR: Could not download qwen3:8b.
-        echo Make sure Ollama is running and try again.
+        echo ERROR: qwen3:8b was not detected after downloading.
+        echo.
+        echo Run this command manually to check:
+        echo ollama list
+        echo.
         pause
         exit /b 1
     )
+
+    echo AI model downloaded successfully.
 )
 
 echo AI model ready.
