@@ -1,5 +1,5 @@
 @echo off
-setlocal
+setlocal EnableExtensions
 
 title MILO - My Intelligent Local Organizer
 
@@ -8,140 +8,134 @@ cd /d "%~dp0"
 echo.
 echo ==========================================
 echo              M.I.L.O
-echo      My Intelligent Local Organizer
+echo       My Intelligent Local Organizer
 echo ==========================================
 echo.
 
-echo Checking Python...
+echo [1/6] Checking Python...
 
-python --version >nul 2>&1
+where python >nul 2>&1
 
-if errorlevel 1 (
+if %errorlevel% neq 0 (
+    echo Python is not installed.
+    echo Installing Python 3.11...
     echo.
-    echo Python was not found.
+
+    winget install --id Python.Python.3.11 -e --accept-source-agreements --accept-package-agreements
+
+    if %errorlevel% neq 0 (
+        echo.
+        echo ERROR: Could not install Python automatically.
+        echo Please install Python 3.11 or newer and run MILO again.
+        pause
+        exit /b 1
+    )
+
     echo.
-    echo Please install Python 3.11 or newer from:
-    echo https://www.python.org/downloads/
-    echo.
+    echo Python installed.
+    echo Please close this window and run Start MILO.bat again.
     pause
-    exit /b 1
+    exit /b 0
 )
 
 echo Python found.
+
 echo.
+echo [2/6] Checking Ollama...
 
-echo Checking Ollama...
+where ollama >nul 2>&1
 
-ollama --version >nul 2>&1
+if %errorlevel% neq 0 (
+    echo Ollama is not installed.
+    echo Installing Ollama...
+    echo.
 
-if errorlevel 1 (
+    winget install --id Ollama.Ollama -e --accept-source-agreements --accept-package-agreements
+
+    if %errorlevel% neq 0 (
+        echo.
+        echo ERROR: Could not install Ollama automatically.
+        echo Please install Ollama and run MILO again.
+        pause
+        exit /b 1
+    )
+
     echo.
-    echo Ollama was not found.
-    echo.
-    echo Please install Ollama from:
-    echo https://ollama.com/download
-    echo.
+    echo Ollama installed.
+    echo Please close this window and run Start MILO.bat again.
     pause
-    exit /b 1
+    exit /b 0
 )
 
 echo Ollama found.
+
 echo.
+echo [3/6] Checking Python dependencies...
 
-echo Checking Ollama server...
+python -c "import fastapi, uvicorn, pydantic, ollama, pypdf" >nul 2>&1
 
-curl -s http://127.0.0.1:11434/api/tags >nul 2>&1
+if %errorlevel% neq 0 (
+    echo Installing MILO dependencies...
+    echo.
 
-if errorlevel 1 (
-    echo Starting Ollama...
+    python -m pip install --upgrade pip
+    python -m pip install -r Backend\requirements.txt
 
-    start "" ollama serve
-
-    timeout /t 5 /nobreak >nul
+    if %errorlevel% neq 0 (
+        echo.
+        echo ERROR: Failed to install Python dependencies.
+        pause
+        exit /b 1
+    )
 )
 
+echo Dependencies ready.
+
 echo.
-echo Checking qwen3:8b...
+echo [4/6] Checking AI model...
 
 ollama list | findstr /C:"qwen3:8b" >nul 2>&1
 
-if errorlevel 1 (
-    echo.
-    echo qwen3:8b was not found.
-    echo MILO will download it now.
-    echo This is approximately 5 GB.
+if %errorlevel% neq 0 (
+    echo qwen3:8b is not installed.
+    echo Downloading the MILO AI model...
+    echo This may take a while.
     echo.
 
     ollama pull qwen3:8b
 
-    if errorlevel 1 (
+    if %errorlevel% neq 0 (
         echo.
-        echo Failed to download qwen3:8b.
-        echo Please make sure Ollama is running and try again.
-        echo.
+        echo ERROR: Could not download qwen3:8b.
+        echo Make sure Ollama is running and try again.
         pause
         exit /b 1
     )
 )
 
-echo.
-echo qwen3:8b is ready.
-echo.
-
-if not exist ".venv" (
-    echo Creating MILO Python environment...
-
-    python -m venv .venv
-
-    if errorlevel 1 (
-        echo.
-        echo Failed to create Python environment.
-        echo.
-        pause
-        exit /b 1
-    )
-)
+echo AI model ready.
 
 echo.
-echo Activating MILO environment...
+echo [5/6] Starting MILO backend...
 
-call ".venv\Scripts\activate.bat"
-
-echo.
-echo Installing required packages...
-
-python -m pip install --upgrade pip
-
-pip install -r "Backend\requirements.txt"
-
-if errorlevel 1 (
-    echo.
-    echo Failed to install Python dependencies.
-    echo.
-    pause
-    exit /b 1
-)
-
-echo.
-echo Starting MILO backend...
-echo.
-
-start "" cmd /k "cd /d ""%~dp0Backend"" && call ""%~dp0.venv\Scripts\activate.bat"" && uvicorn main:app --host 127.0.0.1 --port 8000"
+start "MILO Backend" cmd /k "cd /d "%~dp0Backend" && python -m uvicorn main:app --reload"
 
 timeout /t 3 /nobreak >nul
 
 echo.
-echo Opening MILO...
-echo.
+echo [6/6] Opening MILO...
 
-start "" "https://milo-stardance.vercel.app"
+start "" "%~dp0Frontend\index.html"
 
 echo.
 echo ==========================================
-echo MILO is running.
-echo.
-echo Keep this window open while using MILO.
+echo           MILO IS RUNNING
 echo ==========================================
+echo.
+echo Backend: http://127.0.0.1:8000
+echo.
+echo You can close this window.
+echo Keep the MILO Backend window open.
 echo.
 
 pause
