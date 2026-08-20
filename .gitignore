@@ -1,22 +1,19 @@
-# Python cache
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
+*$py.class
 
-# Virtual environments
-venv/
 .venv/
+venv/
+env/
+ENV/
 
-# Environment / secrets
+.milo_index.json
+
 .env
 .env.*
 
-# MILO generated files
-.milo_index.json
-
-# VS Code
 .vscode/
+.idea/
 
-# Operating system files
 .DS_Store
 Thumbs.db

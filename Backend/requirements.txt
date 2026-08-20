@@ -1,5 +1,5 @@
 fastapi
 uvicorn
+pydantic
 ollama
 pypdf
-python-multipart
