@@ -1,20 +1,22 @@
-# Ignore Python-generated cache files.
+# Python cache
 __pycache__/
-
-# Ignore Python compiled files.
 *.pyc
+*.pyo
 
-# Ignore Python virtual environments.
+# Virtual environments
 venv/
 .venv/
 
-# Ignore environment variable files that may contain secrets.
+# Environment / secrets
 .env
 .env.*
 
-# Ignore VS Code local settings.
+# MILO generated files
+.milo_index.json
+
+# VS Code
 .vscode/
 
-# Ignore operating-system metadata.
+# Operating system files
 .DS_Store
 Thumbs.db
