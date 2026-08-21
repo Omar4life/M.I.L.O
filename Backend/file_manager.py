@@ -1,7 +1,10 @@
 import os
 import re
 import json
+import warnings
+
 from pypdf import PdfReader
+
 
 TEXT_EXTENSIONS = {
     ".txt",
@@ -21,6 +24,8 @@ DOCUMENT_EXTENSIONS = {
 }
 
 INDEX_FILENAME = ".milo_index.json"
+
+MAX_PDF_SIZE = 50 * 1024 * 1024
 
 
 def scan_folder(folder_path):
@@ -61,22 +66,43 @@ def read_file_content(file_path):
     extension = os.path.splitext(file_path)[1].lower()
 
     if extension == ".pdf":
+
         try:
-            reader = PdfReader(file_path)
-            text = ""
+            if not os.path.exists(file_path):
+                return ""
 
-            for page in reader.pages:
-                page_text = page.extract_text()
+            file_size = os.path.getsize(file_path)
 
-                if page_text:
-                    text += page_text + "\n"
+            if file_size > MAX_PDF_SIZE:
+                return ""
 
-            return text.strip()
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+
+                reader = PdfReader(
+                    file_path,
+                    strict=False
+                )
+
+                text = []
+
+                for page in reader.pages:
+                    try:
+                        page_text = page.extract_text()
+
+                        if page_text:
+                            text.append(page_text)
+
+                    except Exception:
+                        continue
+
+                return "\n".join(text).strip()
 
         except Exception:
             return ""
 
     if extension in TEXT_EXTENSIONS:
+
         try:
             with open(
                 file_path,
@@ -120,79 +146,26 @@ def load_index(folder_path):
 def save_index(folder_path, index):
     index_path = get_index_path(folder_path)
 
-    with open(
-        index_path,
-        "w",
-        encoding="utf-8"
-    ) as file:
-        json.dump(
-            index,
-            file,
-            ensure_ascii=False,
-            indent=2
-        )
+    try:
+        with open(
+            index_path,
+            "w",
+            encoding="utf-8"
+        ) as file:
 
-
-def update_index(folder_path):
-    old_index = load_index(
-        folder_path
-    )
-
-    new_index = {}
-
-    for root, folders, files in os.walk(folder_path):
-        for file in files:
-            extension = os.path.splitext(file)[1].lower()
-
-            if extension not in DOCUMENT_EXTENSIONS:
-                continue
-
-            file_path = os.path.join(
-                root,
-                file
+            json.dump(
+                index,
+                file,
+                ensure_ascii=False,
+                indent=2
             )
 
-            try:
-                modified_time = os.path.getmtime(
-                    file_path
-                )
-
-                old_entry = old_index.get(
-                    file_path
-                )
-
-                if (
-                    old_entry
-                    and old_entry.get("modified") == modified_time
-                ):
-                    new_index[file_path] = old_entry
-                    continue
-
-                content = read_file_content(
-                    file_path
-                )
-
-                if content:
-                    new_index[file_path] = {
-                        "name": file,
-                        "path": file_path,
-                        "content": content,
-                        "modified": modified_time
-                    }
-
-            except Exception:
-                continue
-
-    save_index(
-        folder_path,
-        new_index
-    )
-
-    return new_index
+    except Exception:
+        pass
 
 
 def normalize_text(text):
-    text = text.lower()
+    text = str(text).lower()
 
     text = text.replace(
         "spider-man",
@@ -215,6 +188,7 @@ def normalize_text(text):
 
 def expand_query_words(words):
     concept_groups = {
+
         "price": {
             "price",
             "paid",
@@ -227,8 +201,10 @@ def expand_query_words(words):
             "rates",
             "mad",
             "payment",
-            "payments"
+            "payments",
+            "total"
         },
+
         "time": {
             "time",
             "start",
@@ -240,6 +216,7 @@ def expand_query_words(words):
             "hour",
             "when"
         },
+
         "date": {
             "date",
             "day",
@@ -252,6 +229,7 @@ def expand_query_words(words):
             "thu",
             "fri"
         },
+
         "seats": {
             "seat",
             "seats",
@@ -260,6 +238,7 @@ def expand_query_words(words):
             "place",
             "places"
         },
+
         "reservation": {
             "reservation",
             "booking",
@@ -270,6 +249,7 @@ def expand_query_words(words):
             "reference",
             "confirmation"
         },
+
         "location": {
             "location",
             "where",
@@ -279,6 +259,7 @@ def expand_query_words(words):
             "address",
             "place"
         },
+
         "language": {
             "language",
             "version",
@@ -289,6 +270,7 @@ def expand_query_words(words):
             "subtitle",
             "subtitles"
         },
+
         "auditorium": {
             "auditorium",
             "room",
@@ -296,6 +278,7 @@ def expand_query_words(words):
             "4dx",
             "imax"
         },
+
         "duration": {
             "duration",
             "running",
@@ -303,17 +286,103 @@ def expand_query_words(words):
             "length",
             "long",
             "end"
+        },
+
+        "movie": {
+            "movie",
+            "film",
+            "cinema",
+            "show",
+            "session"
+        },
+
+        "ticket": {
+            "ticket",
+            "tickets",
+            "entry",
+            "admission"
         }
     }
 
     expanded = set(words)
 
     for word in words:
+
         for concept_words in concept_groups.values():
+
             if word in concept_words:
-                expanded.update(concept_words)
+                expanded.update(
+                    concept_words
+                )
 
     return expanded
+
+
+def get_document_files(folder_path):
+    documents = []
+
+    for root, folders, files in os.walk(folder_path):
+
+        for file in files:
+
+            if file == INDEX_FILENAME:
+                continue
+
+            extension = os.path.splitext(
+                file
+            )[1].lower()
+
+            if extension not in DOCUMENT_EXTENSIONS:
+                continue
+
+            full_path = os.path.join(
+                root,
+                file
+            )
+
+            try:
+                modified = os.path.getmtime(
+                    full_path
+                )
+
+                size = os.path.getsize(
+                    full_path
+                )
+
+                documents.append({
+                    "name": file,
+                    "path": full_path,
+                    "type": "file",
+                    "modified": modified,
+                    "size": size
+                })
+
+            except Exception:
+                continue
+
+    return documents
+
+
+def score_filename(file_name, useful_words):
+    normalized_name = normalize_text(
+        file_name
+    )
+
+    name_words = set(
+        normalized_name.split()
+    )
+
+    score = 0
+
+    for word in useful_words:
+
+        if word in name_words:
+            score += 100
+
+        elif word in normalized_name:
+            score += 40
+
+    return score
 
 
 def search_document_contents(
@@ -321,10 +390,6 @@ def search_document_contents(
     query,
     limit=5
 ):
-    index = update_index(
-        folder_path
-    )
-
     query_text = normalize_text(
         query
     )
@@ -386,9 +451,7 @@ def search_document_contents(
         "i",
         "it",
         "its",
-        "my",
-        "tell",
-        "me"
+        "tell"
     }
 
     useful_words = [
@@ -405,37 +468,84 @@ def search_document_contents(
         useful_words
     )
 
-    results = []
+    documents = get_document_files(
+        folder_path
+    )
 
-    for file_path, entry in index.items():
-        content = normalize_text(
-            entry["content"]
+    if not documents:
+        return []
+
+    for document in documents:
+
+        document["filename_score"] = score_filename(
+            document["name"],
+            useful_words
         )
 
-        file_name = normalize_text(
-            entry["name"]
+    documents.sort(
+        key=lambda item: (
+            item["filename_score"],
+            item["modified"]
+        ),
+        reverse=True
+    )
+
+    results = []
+
+    for document in documents:
+
+        file_path = document["path"]
+
+        content = read_file_content(
+            file_path
+        )
+
+        if not content:
+            continue
+
+        normalized_content = normalize_text(
+            content
+        )
+
+        normalized_name = normalize_text(
+            document["name"]
         )
 
         matched_original = []
+
         matched_expanded = []
 
         for word in useful_words:
-            pattern = r"\b" + re.escape(word) + r"\b"
+
+            pattern = (
+                r"\b"
+                + re.escape(word)
+                + r"\b"
+            )
 
             if re.search(
                 pattern,
-                content
+                normalized_content
             ):
-                matched_original.append(word)
+                matched_original.append(
+                    word
+                )
 
         for word in expanded_words:
-            pattern = r"\b" + re.escape(word) + r"\b"
+
+            pattern = (
+                r"\b"
+                + re.escape(word)
+                + r"\b"
+            )
 
             if re.search(
                 pattern,
-                content
+                normalized_content
             ):
-                matched_expanded.append(word)
+                matched_expanded.append(
+                    word
+                )
 
         original_count = len(
             matched_original
@@ -448,26 +558,42 @@ def search_document_contents(
         score = 0
 
         score += original_count * 100
+
         score += expanded_count * 20
 
+        score += document["filename_score"]
+
         for word in useful_words:
+
+            pattern = (
+                r"\b"
+                + re.escape(word)
+                + r"\b"
+            )
+
             if re.search(
-                r"\b" + re.escape(word) + r"\b",
-                file_name
+                pattern,
+                normalized_name
             ):
                 score += 150
 
-        if "spiderman" in useful_words:
-            if "spiderman" in content:
-                score += 1000
+        if (
+            "spiderman" in useful_words
+            and "spiderman" in normalized_content
+        ):
+            score += 1000
 
-        if "4dx" in useful_words:
-            if "4dx" in content:
-                score += 1000
+        if (
+            "4dx" in useful_words
+            and "4dx" in normalized_content
+        ):
+            score += 1000
 
-        if "vostfr" in useful_words:
-            if "vostfr" in content:
-                score += 1000
+        if (
+            "vostfr" in useful_words
+            and "vostfr" in normalized_content
+        ):
+            score += 1000
 
         if (
             original_count == 0
@@ -475,17 +601,34 @@ def search_document_contents(
         ):
             continue
 
-        if original_count == 0 and expanded_count < 2:
+        if (
+            original_count == 0
+            and expanded_count < 2
+        ):
             continue
 
         results.append({
-            "name": entry["name"],
-            "path": entry["path"],
+            "name": document["name"],
+            "path": document["path"],
             "type": "file",
             "score": score,
             "matched": original_count,
             "expanded": expanded_count
         })
+
+        strong_match = False
+
+        if "spiderman" in normalized_content:
+            strong_match = True
+
+        if (
+            original_count >= 2
+            and expanded_count >= 2
+        ):
+            strong_match = True
+
+        if strong_match and len(results) >= 1:
+            break
 
     results.sort(
         key=lambda item: (
@@ -510,6 +653,7 @@ def search_document_contents(
     final_results = []
 
     for result in strong_results[:limit]:
+
         final_results.append({
             "name": result["name"],
             "path": result["path"],
@@ -581,9 +725,12 @@ def get_candidate_files(
     scored = []
 
     for item in files:
+
         name = item["name"].lower()
 
-        name_without_extension = os.path.splitext(name)[0]
+        name_without_extension = os.path.splitext(
+            name
+        )[0]
 
         name_words = re.findall(
             r"[a-zA-Z0-9]+",
@@ -594,6 +741,7 @@ def get_candidate_files(
         matched_words = 0
 
         for word in useful_words:
+
             if word in name_words:
                 score += 10
                 matched_words += 1
@@ -603,6 +751,7 @@ def get_candidate_files(
                 matched_words += 1
 
         if matched_words > 0:
+
             scored.append({
                 "item": item,
                 "score": score
@@ -617,4 +766,3 @@ def get_candidate_files(
         item["item"]
         for item in scored[:limit]
     ]
-
