@@ -4,6 +4,9 @@ import json
 import warnings
 
 from pypdf import PdfReader
+import pymupdf
+import pytesseract
+from PIL import Image
 
 
 TEXT_EXTENSIONS = {
@@ -27,6 +30,10 @@ INDEX_FILENAME = ".milo_index.json"
 
 MAX_PDF_SIZE = 50 * 1024 * 1024
 
+TESSERACT_PATH = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+
+pytesseract.pytesseract.tesseract_cmd = TESSERACT_PATH
+
 
 def scan_folder(folder_path):
     if not os.path.exists(folder_path):
@@ -37,12 +44,30 @@ def scan_folder(folder_path):
 
     results = []
 
+    skip_folders = {
+        "node_modules",
+        ".git",
+        "__pycache__",
+        ".venv",
+        "venv"
+    }
+
     for root, folders, files in os.walk(folder_path):
+
+        folders[:] = [
+            folder
+            for folder in folders
+            if folder not in skip_folders
+        ]
+
         if INDEX_FILENAME in files:
             files.remove(INDEX_FILENAME)
 
         for folder in folders:
-            full_path = os.path.join(root, folder)
+            full_path = os.path.join(
+                root,
+                folder
+            )
 
             results.append({
                 "name": folder,
@@ -51,7 +76,10 @@ def scan_folder(folder_path):
             })
 
         for file in files:
-            full_path = os.path.join(root, file)
+            full_path = os.path.join(
+                root,
+                file
+            )
 
             results.append({
                 "name": file,
@@ -62,44 +90,126 @@ def scan_folder(folder_path):
     return results
 
 
-def read_file_content(file_path):
-    extension = os.path.splitext(file_path)[1].lower()
+def read_pdf_text(file_path):
+    try:
+        if not os.path.exists(file_path):
+            return ""
 
-    if extension == ".pdf":
+        file_size = os.path.getsize(file_path)
 
-        try:
-            if not os.path.exists(file_path):
-                return ""
+        if file_size > MAX_PDF_SIZE:
+            return ""
 
-            file_size = os.path.getsize(file_path)
+        text_parts = []
 
-            if file_size > MAX_PDF_SIZE:
-                return ""
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
 
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-
+            try:
                 reader = PdfReader(
                     file_path,
                     strict=False
                 )
-
-                text = []
 
                 for page in reader.pages:
                     try:
                         page_text = page.extract_text()
 
                         if page_text:
-                            text.append(page_text)
+                            text_parts.append(
+                                page_text
+                            )
 
                     except Exception:
                         continue
 
-                return "\n".join(text).strip()
+            except Exception:
+                pass
 
-        except Exception:
+        normal_text = "\n".join(
+            text_parts
+        ).strip()
+
+        # If the PDF has real selectable text, use it.
+        if len(normal_text) >= 50:
+            return normal_text
+
+        # Otherwise use OCR for scanned/image PDFs.
+        return ocr_pdf(file_path)
+
+    except Exception:
+        return ""
+
+
+def ocr_pdf(file_path):
+    try:
+        if not os.path.exists(
+            TESSERACT_PATH
+        ):
             return ""
+
+        document = pymupdf.open(
+            file_path
+        )
+
+        text_parts = []
+
+        try:
+            for page in document:
+
+                try:
+                    # Render the PDF page at 2x resolution
+                    # so OCR can read scanned documents better.
+                    pixmap = page.get_pixmap(
+                        matrix=pymupdf.Matrix(
+                            2,
+                            2
+                        ),
+                        alpha=False
+                    )
+
+                    image = Image.frombytes(
+                        "RGB",
+                        (
+                            pixmap.width,
+                            pixmap.height
+                        ),
+                        pixmap.samples
+                    )
+
+                    page_text = pytesseract.image_to_string(
+                        image,
+                        config="--psm 6"
+                    )
+
+                    if page_text:
+                        text_parts.append(
+                            page_text
+                        )
+
+                except Exception:
+                    continue
+
+        finally:
+            document.close()
+
+        return "\n".join(
+            text_parts
+        ).strip()
+
+    except Exception:
+        return ""
+
+
+def read_file_content(file_path):
+    extension = os.path.splitext(
+        file_path
+    )[1].lower()
+
+    if extension == ".pdf":
+        return read_pdf_text(
+            file_path
+        )
 
     if extension in TEXT_EXTENSIONS:
 
@@ -110,6 +220,7 @@ def read_file_content(file_path):
                 encoding="utf-8",
                 errors="ignore"
             ) as file:
+
                 return file.read()
 
         except Exception:
@@ -126,9 +237,13 @@ def get_index_path(folder_path):
 
 
 def load_index(folder_path):
-    index_path = get_index_path(folder_path)
+    index_path = get_index_path(
+        folder_path
+    )
 
-    if not os.path.exists(index_path):
+    if not os.path.exists(
+        index_path
+    ):
         return {}
 
     try:
@@ -137,6 +252,7 @@ def load_index(folder_path):
             "r",
             encoding="utf-8"
         ) as file:
+
             return json.load(file)
 
     except Exception:
@@ -144,7 +260,9 @@ def load_index(folder_path):
 
 
 def save_index(folder_path, index):
-    index_path = get_index_path(folder_path)
+    index_path = get_index_path(
+        folder_path
+    )
 
     try:
         with open(
@@ -165,7 +283,9 @@ def save_index(folder_path, index):
 
 
 def normalize_text(text):
-    text = str(text).lower()
+    text = str(
+        text
+    ).lower()
 
     text = text.replace(
         "spider-man",
@@ -175,6 +295,16 @@ def normalize_text(text):
     text = text.replace(
         "spider man",
         "spiderman"
+    )
+
+    text = text.replace(
+        "education world wide",
+        "eduww"
+    )
+
+    text = text.replace(
+        "verification of enrollment",
+        "voe enrollment"
     )
 
     text = re.sub(
@@ -301,10 +431,26 @@ def expand_query_words(words):
             "tickets",
             "entry",
             "admission"
+        },
+
+        "school": {
+            "school",
+            "education",
+            "eduww",
+            "student",
+            "enrollment",
+            "enrolment",
+            "voe",
+            "verification",
+            "administrator",
+            "curriculum",
+            "academic"
         }
     }
 
-    expanded = set(words)
+    expanded = set(
+        words
+    )
 
     for word in words:
 
@@ -321,7 +467,23 @@ def expand_query_words(words):
 def get_document_files(folder_path):
     documents = []
 
-    for root, folders, files in os.walk(folder_path):
+    skip_folders = {
+        "node_modules",
+        ".git",
+        "__pycache__",
+        ".venv",
+        "venv"
+    }
+
+    for root, folders, files in os.walk(
+        folder_path
+    ):
+
+        folders[:] = [
+            folder
+            for folder in folders
+            if folder not in skip_folders
+        ]
 
         for file in files:
 
@@ -363,7 +525,10 @@ def get_document_files(folder_path):
     return documents
 
 
-def score_filename(file_name, useful_words):
+def score_filename(
+    file_name,
+    useful_words
+):
     normalized_name = normalize_text(
         file_name
     )
@@ -475,21 +640,6 @@ def search_document_contents(
     if not documents:
         return []
 
-    for document in documents:
-
-        document["filename_score"] = score_filename(
-            document["name"],
-            useful_words
-        )
-
-    documents.sort(
-        key=lambda item: (
-            item["filename_score"],
-            item["modified"]
-        ),
-        reverse=True
-    )
-
     results = []
 
     for document in documents:
@@ -512,7 +662,6 @@ def search_document_contents(
         )
 
         matched_original = []
-
         matched_expanded = []
 
         for word in useful_words:
@@ -555,27 +704,49 @@ def search_document_contents(
             matched_expanded
         )
 
+        filename_score = score_filename(
+            document["name"],
+            useful_words
+        )
+
         score = 0
 
         score += original_count * 100
-
         score += expanded_count * 20
+        score += filename_score
 
-        score += document["filename_score"]
-
-        for word in useful_words:
-
-            pattern = (
-                r"\b"
-                + re.escape(word)
-                + r"\b"
-            )
-
-            if re.search(
-                pattern,
-                normalized_name
+        if "eduww" in normalized_content:
+            if any(
+                word in useful_words
+                for word in [
+                    "school",
+                    "education",
+                    "enrollment",
+                    "enrolment",
+                    "voe",
+                    "verification"
+                ]
             ):
-                score += 150
+                score += 2000
+
+        if (
+            "enrollment" in normalized_content
+            and "verification" in normalized_content
+        ):
+            score += 2000
+
+        if "student" in normalized_content:
+            if any(
+                word in useful_words
+                for word in [
+                    "school",
+                    "education",
+                    "student",
+                    "enrollment",
+                    "enrolment"
+                ]
+            ):
+                score += 500
 
         if (
             "spiderman" in useful_words
@@ -616,20 +787,6 @@ def search_document_contents(
             "expanded": expanded_count
         })
 
-        strong_match = False
-
-        if "spiderman" in normalized_content:
-            strong_match = True
-
-        if (
-            original_count >= 2
-            and expanded_count >= 2
-        ):
-            strong_match = True
-
-        if strong_match and len(results) >= 1:
-            break
-
     results.sort(
         key=lambda item: (
             item["score"],
@@ -650,17 +807,14 @@ def search_document_contents(
         if result["score"] >= best_score * 0.35
     ]
 
-    final_results = []
-
-    for result in strong_results[:limit]:
-
-        final_results.append({
+    return [
+        {
             "name": result["name"],
             "path": result["path"],
             "type": result["type"]
-        })
-
-    return final_results
+        }
+        for result in strong_results[:limit]
+    ]
 
 
 def get_candidate_files(
