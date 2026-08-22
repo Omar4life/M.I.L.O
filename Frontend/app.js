@@ -1,15 +1,32 @@
 const API_URL = "http://127.0.0.1:8000";
 
-const folderPath = document.getElementById("folderPath");
-const scanButton = document.getElementById("scanButton");
-const commandInput = document.getElementById("commandInput");
-const runButton = document.getElementById("runButton");
-const status = document.getElementById("status");
+const folderPath =
+    document.getElementById("folderPath");
 
-const messages = document.getElementById("chatMessages");
-const chatList = document.getElementById("chatHistory");
-const newChatButton = document.getElementById("newChatButton");
-const currentChatTitle = document.getElementById("currentChatTitle");
+const scanButton =
+    document.getElementById("scanButton");
+
+const commandInput =
+    document.getElementById("commandInput");
+
+const runButton =
+    document.getElementById("runButton");
+
+const status =
+    document.getElementById("status");
+
+const messages =
+    document.getElementById("chatMessages");
+
+const chatList =
+    document.getElementById("chatHistory");
+
+const newChatButton =
+    document.getElementById("newChatButton");
+
+const currentChatTitle =
+    document.getElementById("currentChatTitle");
+
 
 let chats = JSON.parse(
     localStorage.getItem("miloChats") || "[]"
@@ -28,14 +45,22 @@ function saveChats() {
 
 function createChat() {
     const chat = {
-        id: Date.now().toString(),
+        id:
+            Date.now().toString()
+            + "-"
+            + Math.random()
+                .toString(36)
+                .slice(2),
+
         title: "New chat",
+
         messages: []
     };
 
     chats.unshift(chat);
 
-    currentChatId = chat.id;
+    currentChatId =
+        chat.id;
 
     saveChats();
 
@@ -46,31 +71,41 @@ function createChat() {
 
 function getCurrentChat() {
     return chats.find(
-        chat => chat.id === currentChatId
+        chat =>
+            chat.id === currentChatId
     );
 }
 
 
 function renderChatList() {
+
     chatList.innerHTML = "";
 
     chats.forEach(chat => {
 
-        const item = document.createElement("div");
+        const item =
+            document.createElement("div");
 
-        item.className = "chat-history-item";
+        item.className =
+            "chat-history-item";
 
-        if (chat.id === currentChatId) {
-            item.classList.add("active");
+        if (
+            chat.id === currentChatId
+        ) {
+            item.classList.add(
+                "active"
+            );
         }
 
-        item.textContent = chat.title;
+        item.textContent =
+            chat.title;
 
         item.addEventListener(
             "click",
             () => {
 
-                currentChatId = chat.id;
+                currentChatId =
+                    chat.id;
 
                 renderChatList();
                 renderCurrentChat();
@@ -79,14 +114,17 @@ function renderChatList() {
             }
         );
 
-        chatList.appendChild(item);
+        chatList.appendChild(
+            item
+        );
     });
 }
 
 
 function renderCurrentChat() {
 
-    const chat = getCurrentChat();
+    const chat =
+        getCurrentChat();
 
     if (!chat) {
         return;
@@ -95,7 +133,9 @@ function renderCurrentChat() {
     currentChatTitle.textContent =
         chat.title;
 
-    if (chat.messages.length === 0) {
+    if (
+        chat.messages.length === 0
+    ) {
 
         messages.innerHTML = `
             <div class="welcome-message">
@@ -109,8 +149,9 @@ function renderCurrentChat() {
                 </h2>
 
                 <p>
-                    Ask MILO to find, read, or organize
-                    something on your computer.
+                    Ask MILO to find, read,
+                    or organize something
+                    on your computer.
                 </p>
 
                 <div class="suggestions">
@@ -139,15 +180,17 @@ function renderCurrentChat() {
 
     messages.innerHTML = "";
 
-    chat.messages.forEach(message => {
+    chat.messages.forEach(
+        message => {
 
-        renderMessage(
-            message.role,
-            message.text,
-            message.results || []
-        );
+            renderMessage(
+                message.role,
+                message.text,
+                message.results || []
+            );
 
-    });
+        }
+    );
 
     scrollToBottom();
 }
@@ -178,31 +221,41 @@ function renderMessage(
         bubble
     );
 
-    if (results.length > 0) {
+    if (
+        results.length > 0
+    ) {
 
-        results.forEach(item => {
+        results.forEach(
+            item => {
 
-            const result =
-                document.createElement("div");
+                const result =
+                    document.createElement(
+                        "div"
+                    );
 
-            result.className =
-                "result";
+                result.className =
+                    "result";
 
-            result.innerHTML = `
-                <div class="result-name">
-                    ${item.type === "folder" ? "📁" : "📄"}
-                    ${escapeHTML(item.name)}
-                </div>
+                result.innerHTML = `
+                    <div class="result-name">
+                        ${
+                            item.type === "folder"
+                                ? "📁"
+                                : "📄"
+                        }
+                        ${escapeHTML(item.name)}
+                    </div>
 
-                <div class="result-path">
-                    ${escapeHTML(item.path)}
-                </div>
-            `;
+                    <div class="result-path">
+                        ${escapeHTML(item.path)}
+                    </div>
+                `;
 
-            wrapper.appendChild(
-                result
-            );
-        });
+                wrapper.appendChild(
+                    result
+                );
+            }
+        );
     }
 
     messages.appendChild(
@@ -235,8 +288,8 @@ function addMessage(
     });
 
     if (
-        role === "user" &&
-        chat.title === "New chat"
+        role === "user"
+        && chat.title === "New chat"
     ) {
 
         chat.title =
@@ -264,15 +317,17 @@ function makeChatTitle(text) {
     const words =
         cleaned.split(/\s+/);
 
-    if (words.length <= 5) {
+    if (
+        words.length <= 5
+    ) {
         return cleaned;
     }
 
     return (
         words
             .slice(0, 5)
-            .join(" ") +
-        "..."
+            .join(" ")
+        + "..."
     );
 }
 
@@ -292,6 +347,9 @@ async function scanFolder() {
 
     status.textContent =
         "Scanning folder...";
+
+    scanButton.disabled =
+        true;
 
     try {
 
@@ -330,6 +388,11 @@ async function scanFolder() {
 
         status.textContent =
             `Error: ${error.message}`;
+
+    } finally {
+
+        scanButton.disabled =
+            false;
     }
 }
 
@@ -365,8 +428,30 @@ async function runCommand() {
 
     commandInput.value = "";
 
+    runButton.disabled =
+        true;
+
+    commandInput.disabled =
+        true;
+
     status.textContent =
         "MILO is thinking...";
+
+    const chat =
+        getCurrentChat();
+
+    const conversationHistory =
+        chat.messages
+            .slice(-12)
+            .map(message => ({
+                role:
+                    message.role === "user"
+                        ? "user"
+                        : "assistant",
+
+                content:
+                    message.text
+            }));
 
     try {
 
@@ -383,7 +468,11 @@ async function runCommand() {
 
                     body: JSON.stringify({
                         command,
-                        folder
+                        folder,
+                        chat_id:
+                            currentChatId,
+                        conversation:
+                            conversationHistory
                     })
                 }
             );
@@ -400,16 +489,21 @@ async function runCommand() {
         }
 
 
-        if (data.action === "SEARCH") {
+        if (
+            data.action === "SEARCH"
+        ) {
 
             const results =
                 data.results || [];
 
-            if (results.length === 0) {
+            if (
+                results.length === 0
+            ) {
 
                 addMessage(
                     "milo",
-                    "I couldn't find anything matching that."
+                    "I couldn't find anything matching that.",
+                    []
                 );
 
             } else {
@@ -421,22 +515,37 @@ async function runCommand() {
                 );
             }
 
-
-        } else if (data.action === "QUESTION") {
+        } else if (
+            data.action === "QUESTION"
+        ) {
 
             addMessage(
                 "milo",
                 data.answer ||
-                "I couldn't answer that."
+                "I couldn't answer that.",
+                data.file
+                    ? [data.file]
+                    : []
             );
 
+        } else if (
+            data.action === "CHAT"
+        ) {
+
+            addMessage(
+                "milo",
+                data.answer ||
+                "I'm listening.",
+                []
+            );
 
         } else {
 
             addMessage(
                 "milo",
                 data.message ||
-                "I don't support that yet."
+                "I'm not sure what to do yet.",
+                []
             );
         }
 
@@ -446,10 +555,21 @@ async function runCommand() {
 
         addMessage(
             "milo",
-            `Something went wrong: ${error.message}`
+            `Something went wrong: ${error.message}`,
+            []
         );
 
         status.textContent = "";
+
+    } finally {
+
+        runButton.disabled =
+            false;
+
+        commandInput.disabled =
+            false;
+
+        commandInput.focus();
     }
 }
 
@@ -458,20 +578,22 @@ function attachSuggestions() {
 
     document
         .querySelectorAll(".suggestion")
-        .forEach(button => {
+        .forEach(
+            button => {
 
-            button.addEventListener(
-                "click",
-                () => {
+                button.addEventListener(
+                    "click",
+                    () => {
 
-                    commandInput.value =
-                        button.textContent.trim();
+                        commandInput.value =
+                            button.textContent.trim();
 
-                    commandInput.focus();
-                }
-            );
+                        commandInput.focus();
+                    }
+                );
 
-        });
+            }
+        );
 }
 
 
@@ -529,10 +651,11 @@ folderPath.addEventListener(
     "keydown",
     event => {
 
-        if (event.key === "Enter") {
+        if (
+            event.key === "Enter"
+        ) {
             scanFolder();
         }
-
     }
 );
 
@@ -547,10 +670,11 @@ commandInput.addEventListener(
     "keydown",
     event => {
 
-        if (event.key === "Enter") {
+        if (
+            event.key === "Enter"
+        ) {
             runCommand();
         }
-
     }
 );
 

@@ -2,6 +2,7 @@ import os
 import re
 import json
 import warnings
+import logging
 
 from pypdf import PdfReader
 import pymupdf
@@ -33,6 +34,11 @@ MAX_PDF_SIZE = 50 * 1024 * 1024
 TESSERACT_PATH = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 pytesseract.pytesseract.tesseract_cmd = TESSERACT_PATH
+
+# Keep pypdf warnings out of the MILO terminal.
+logging.getLogger("pypdf").setLevel(logging.ERROR)
+logging.getLogger("pypdf._reader").setLevel(logging.ERROR)
+logging.getLogger("pypdf.generic").setLevel(logging.ERROR)
 
 
 def scan_folder(folder_path):
@@ -102,39 +108,50 @@ def read_pdf_text(file_path):
 
         text_parts = []
 
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
+        pypdf_logger = logging.getLogger("pypdf")
+        original_level = pypdf_logger.level
 
-            try:
-                reader = PdfReader(
-                    file_path,
-                    strict=False
-                )
+        pypdf_logger.setLevel(logging.CRITICAL)
 
-                for page in reader.pages:
-                    try:
-                        page_text = page.extract_text()
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
 
-                        if page_text:
-                            text_parts.append(
-                                page_text
-                            )
+                try:
+                    reader = PdfReader(
+                        file_path,
+                        strict=False
+                    )
 
-                    except Exception:
-                        continue
+                    for page in reader.pages:
+                        try:
+                            page_text = page.extract_text()
 
-            except Exception:
-                pass
+                            if page_text:
+                                text_parts.append(
+                                    page_text
+                                )
+
+                        except Exception:
+                            continue
+
+                except Exception:
+                    pass
+
+        finally:
+            pypdf_logger.setLevel(
+                original_level
+            )
 
         normal_text = "\n".join(
             text_parts
         ).strip()
 
-        # If the PDF has real selectable text, use it.
+        # Normal selectable-text PDF.
         if len(normal_text) >= 50:
             return normal_text
 
-        # Otherwise use OCR for scanned/image PDFs.
+        # Scanned/image PDF.
         return ocr_pdf(file_path)
 
     except Exception:
@@ -158,8 +175,6 @@ def ocr_pdf(file_path):
             for page in document:
 
                 try:
-                    # Render the PDF page at 2x resolution
-                    # so OCR can read scanned documents better.
                     pixmap = page.get_pixmap(
                         matrix=pymupdf.Matrix(
                             2,
