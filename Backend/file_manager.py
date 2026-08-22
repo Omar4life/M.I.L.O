@@ -3,6 +3,7 @@ import re
 import json
 import warnings
 import logging
+from datetime import datetime
 
 from pypdf import PdfReader
 import pymupdf
@@ -33,12 +34,13 @@ MAX_PDF_SIZE = 50 * 1024 * 1024
 
 TESSERACT_PATH = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
+MAX_OCR_CANDIDATES = 30
+
 pytesseract.pytesseract.tesseract_cmd = TESSERACT_PATH
 
-# Keep pypdf warnings out of the MILO terminal.
-logging.getLogger("pypdf").setLevel(logging.ERROR)
-logging.getLogger("pypdf._reader").setLevel(logging.ERROR)
-logging.getLogger("pypdf.generic").setLevel(logging.ERROR)
+logging.getLogger("pypdf").setLevel(logging.CRITICAL)
+logging.getLogger("pypdf._reader").setLevel(logging.CRITICAL)
+logging.getLogger("pypdf.generic").setLevel(logging.CRITICAL)
 
 
 def scan_folder(folder_path):
@@ -55,7 +57,11 @@ def scan_folder(folder_path):
         ".git",
         "__pycache__",
         ".venv",
-        "venv"
+        "venv",
+        ".next",
+        "dist",
+        "build",
+        ".cache"
     }
 
     for root, folders, files in os.walk(folder_path):
@@ -96,14 +102,62 @@ def scan_folder(folder_path):
     return results
 
 
-def read_pdf_text(file_path):
+def get_index_path(folder_path):
+    return os.path.join(
+        folder_path,
+        INDEX_FILENAME
+    )
+
+
+def load_index(folder_path):
+    index_path = get_index_path(
+        folder_path
+    )
+
+    if not os.path.exists(index_path):
+        return {}
+
+    try:
+        with open(
+            index_path,
+            "r",
+            encoding="utf-8"
+        ) as file:
+            return json.load(file)
+
+    except Exception:
+        return {}
+
+
+def save_index(folder_path, index):
+    index_path = get_index_path(
+        folder_path
+    )
+
+    try:
+        with open(
+            index_path,
+            "w",
+            encoding="utf-8"
+        ) as file:
+
+            json.dump(
+                index,
+                file,
+                ensure_ascii=False,
+                indent=2
+            )
+
+    except Exception:
+        pass
+
+
+def read_pdf_text_fast(file_path):
     try:
         if not os.path.exists(file_path):
             return ""
 
-        file_size = os.path.getsize(file_path)
-
-        if file_size > MAX_PDF_SIZE:
+        if os.path.getsize(file_path) > MAX_PDF_SIZE:
             return ""
 
         text_parts = []
@@ -111,7 +165,9 @@ def read_pdf_text(file_path):
         pypdf_logger = logging.getLogger("pypdf")
         original_level = pypdf_logger.level
 
-        pypdf_logger.setLevel(logging.CRITICAL)
+        pypdf_logger.setLevel(
+            logging.CRITICAL
+        )
 
         try:
             with warnings.catch_warnings():
@@ -124,6 +180,7 @@ def read_pdf_text(file_path):
                     )
 
                     for page in reader.pages:
+
                         try:
                             page_text = page.extract_text()
 
@@ -143,16 +200,45 @@ def read_pdf_text(file_path):
                 original_level
             )
 
-        normal_text = "\n".join(
+        text = "\n".join(
             text_parts
         ).strip()
 
-        # Normal selectable-text PDF.
-        if len(normal_text) >= 50:
-            return normal_text
+        if len(text) >= 20:
+            return text
 
-        # Scanned/image PDF.
-        return ocr_pdf(file_path)
+        try:
+            document = pymupdf.open(
+                file_path
+            )
+
+            text_parts = []
+
+            for page in document:
+
+                try:
+                    page_text = page.get_text(
+                        "text"
+                    )
+
+                    if page_text:
+                        text_parts.append(
+                            page_text
+                        )
+
+                except Exception:
+                    continue
+
+            document.close()
+
+            text = "\n".join(
+                text_parts
+            ).strip()
+
+            return text
+
+        except Exception:
+            return text
 
     except Exception:
         return ""
@@ -216,14 +302,34 @@ def ocr_pdf(file_path):
         return ""
 
 
+def read_pdf_content(
+    file_path,
+    allow_ocr=True
+):
+    fast_text = read_pdf_text_fast(
+        file_path
+    )
+
+    if fast_text:
+        return fast_text
+
+    if allow_ocr:
+        return ocr_pdf(
+            file_path
+        )
+
+    return ""
+
+
 def read_file_content(file_path):
     extension = os.path.splitext(
         file_path
     )[1].lower()
 
     if extension == ".pdf":
-        return read_pdf_text(
-            file_path
+        return read_pdf_content(
+            file_path,
+            allow_ocr=True
         )
 
     if extension in TEXT_EXTENSIONS:
@@ -242,59 +348,6 @@ def read_file_content(file_path):
             return ""
 
     return ""
-
-
-def get_index_path(folder_path):
-    return os.path.join(
-        folder_path,
-        INDEX_FILENAME
-    )
-
-
-def load_index(folder_path):
-    index_path = get_index_path(
-        folder_path
-    )
-
-    if not os.path.exists(
-        index_path
-    ):
-        return {}
-
-    try:
-        with open(
-            index_path,
-            "r",
-            encoding="utf-8"
-        ) as file:
-
-            return json.load(file)
-
-    except Exception:
-        return {}
-
-
-def save_index(folder_path, index):
-    index_path = get_index_path(
-        folder_path
-    )
-
-    try:
-        with open(
-            index_path,
-            "w",
-            encoding="utf-8"
-        ) as file:
-
-            json.dump(
-                index,
-                file,
-                ensure_ascii=False,
-                indent=2
-            )
-
-    except Exception:
-        pass
 
 
 def normalize_text(text):
@@ -468,7 +521,6 @@ def expand_query_words(words):
     )
 
     for word in words:
-
         for concept_words in concept_groups.values():
 
             if word in concept_words:
@@ -487,7 +539,11 @@ def get_document_files(folder_path):
         ".git",
         "__pycache__",
         ".venv",
-        "venv"
+        "venv",
+        ".next",
+        "dist",
+        "build",
+        ".cache"
     }
 
     for root, folders, files in os.walk(
@@ -518,20 +574,16 @@ def get_document_files(folder_path):
             )
 
             try:
-                modified = os.path.getmtime(
-                    full_path
-                )
-
-                size = os.path.getsize(
-                    full_path
-                )
-
                 documents.append({
                     "name": file,
                     "path": full_path,
                     "type": "file",
-                    "modified": modified,
-                    "size": size
+                    "modified": os.path.getmtime(
+                        full_path
+                    ),
+                    "size": os.path.getsize(
+                        full_path
+                    )
                 })
 
             except Exception:
@@ -565,11 +617,7 @@ def score_filename(
     return score
 
 
-def search_document_contents(
-    folder_path,
-    query,
-    limit=5
-):
+def build_query_words(query):
     query_text = normalize_text(
         query
     )
@@ -600,6 +648,7 @@ def search_document_contents(
         "with",
         "which",
         "document",
+        "documents",
         "whatever",
         "called",
         "named",
@@ -641,6 +690,146 @@ def search_document_contents(
         and len(word) >= 3
     ]
 
+    return useful_words
+
+
+def score_content(
+    content,
+    file_name,
+    useful_words,
+    expanded_words
+):
+    normalized_content = normalize_text(
+        content
+    )
+
+    normalized_name = normalize_text(
+        file_name
+    )
+
+    matched_original = []
+    matched_expanded = []
+
+    for word in useful_words:
+
+        pattern = (
+            r"\b"
+            + re.escape(word)
+            + r"\b"
+        )
+
+        if re.search(
+            pattern,
+            normalized_content
+        ):
+            matched_original.append(
+                word
+            )
+
+    for word in expanded_words:
+
+        pattern = (
+            r"\b"
+            + re.escape(word)
+            + r"\b"
+        )
+
+        if re.search(
+            pattern,
+            normalized_content
+        ):
+            matched_expanded.append(
+                word
+            )
+
+    original_count = len(
+        set(matched_original)
+    )
+
+    expanded_count = len(
+        set(matched_expanded)
+    )
+
+    filename_score = score_filename(
+        file_name,
+        useful_words
+    )
+
+    score = 0
+
+    score += original_count * 100
+    score += expanded_count * 20
+    score += filename_score
+
+    if "eduww" in normalized_content:
+
+        if any(
+            word in useful_words
+            for word in [
+                "school",
+                "education",
+                "enrollment",
+                "enrolment",
+                "voe",
+                "verification"
+            ]
+        ):
+            score += 2000
+
+    if (
+        "enrollment" in normalized_content
+        and "verification" in normalized_content
+    ):
+        score += 2000
+
+    if "student" in normalized_content:
+
+        if any(
+            word in useful_words
+            for word in [
+                "school",
+                "education",
+                "student",
+                "enrollment",
+                "enrolment"
+            ]
+        ):
+            score += 500
+
+    if (
+        "spiderman" in useful_words
+        and "spiderman" in normalized_content
+    ):
+        score += 1000
+
+    if (
+        "4dx" in useful_words
+        and "4dx" in normalized_content
+    ):
+        score += 1000
+
+    if (
+        "vostfr" in useful_words
+        and "vostfr" in normalized_content
+    ):
+        score += 1000
+
+    return {
+        "score": score,
+        "matched": original_count,
+        "expanded": expanded_count
+    }
+
+
+def search_document_contents(
+    folder_path,
+    query,
+    limit=5
+):
+    useful_words = build_query_words(
+        query
+    )
+
     if not useful_words:
         return []
 
@@ -655,154 +844,129 @@ def search_document_contents(
     if not documents:
         return []
 
-    results = []
+    index = load_index(
+        folder_path
+    )
+
+    changed_index = False
+
+    text_results = []
+
+    scanned_documents = []
 
     for document in documents:
 
         file_path = document["path"]
 
-        content = read_file_content(
+        try:
+            modified = document["modified"]
+
+        except Exception:
+            modified = 0
+
+        cached = index.get(
             file_path
         )
 
-        if not content:
-            continue
+        content = ""
 
-        normalized_content = normalize_text(
-            content
-        )
+        if (
+            cached
+            and cached.get("modified") == modified
+            and "content" in cached
+            and cached.get("ocr") is False
+        ):
 
-        normalized_name = normalize_text(
-            document["name"]
-        )
-
-        matched_original = []
-        matched_expanded = []
-
-        for word in useful_words:
-
-            pattern = (
-                r"\b"
-                + re.escape(word)
-                + r"\b"
+            content = cached.get(
+                "content",
+                ""
             )
 
-            if re.search(
-                pattern,
-                normalized_content
-            ):
-                matched_original.append(
-                    word
+        else:
+
+            extension = os.path.splitext(
+                file_path
+            )[1].lower()
+
+            if extension in {
+                ".txt",
+                ".md",
+                ".py",
+                ".js",
+                ".html",
+                ".css",
+                ".json",
+                ".csv"
+            }:
+
+                content = read_file_content(
+                    file_path
                 )
 
-        for word in expanded_words:
+                index[file_path] = {
+                    "modified": modified,
+                    "content": content,
+                    "ocr": False
+                }
 
-            pattern = (
-                r"\b"
-                + re.escape(word)
-                + r"\b"
+                changed_index = True
+
+            elif extension == ".pdf":
+
+                # First pass never OCRs.
+                content = read_pdf_text_fast(
+                    file_path
+                )
+
+                index[file_path] = {
+                    "modified": modified,
+                    "content": content,
+                    "ocr": False
+                }
+
+                changed_index = True
+
+        if content:
+
+            scored = score_content(
+                content,
+                document["name"],
+                useful_words,
+                expanded_words
             )
 
-            if re.search(
-                pattern,
-                normalized_content
+            if (
+                scored["matched"] > 0
+                or scored["expanded"] >= 2
             ):
-                matched_expanded.append(
-                    word
-                )
 
-        original_count = len(
-            matched_original
+                text_results.append({
+                    "name": document["name"],
+                    "path": document["path"],
+                    "type": "file",
+                    "score": scored["score"],
+                    "matched": scored["matched"],
+                    "expanded": scored["expanded"]
+                })
+
+        elif (
+            os.path.splitext(
+                file_path
+            )[1].lower()
+            == ".pdf"
+        ):
+
+            scanned_documents.append(
+                document
+            )
+
+    if changed_index:
+        save_index(
+            folder_path,
+            index
         )
 
-        expanded_count = len(
-            matched_expanded
-        )
-
-        filename_score = score_filename(
-            document["name"],
-            useful_words
-        )
-
-        score = 0
-
-        score += original_count * 100
-        score += expanded_count * 20
-        score += filename_score
-
-        if "eduww" in normalized_content:
-            if any(
-                word in useful_words
-                for word in [
-                    "school",
-                    "education",
-                    "enrollment",
-                    "enrolment",
-                    "voe",
-                    "verification"
-                ]
-            ):
-                score += 2000
-
-        if (
-            "enrollment" in normalized_content
-            and "verification" in normalized_content
-        ):
-            score += 2000
-
-        if "student" in normalized_content:
-            if any(
-                word in useful_words
-                for word in [
-                    "school",
-                    "education",
-                    "student",
-                    "enrollment",
-                    "enrolment"
-                ]
-            ):
-                score += 500
-
-        if (
-            "spiderman" in useful_words
-            and "spiderman" in normalized_content
-        ):
-            score += 1000
-
-        if (
-            "4dx" in useful_words
-            and "4dx" in normalized_content
-        ):
-            score += 1000
-
-        if (
-            "vostfr" in useful_words
-            and "vostfr" in normalized_content
-        ):
-            score += 1000
-
-        if (
-            original_count == 0
-            and expanded_count == 0
-        ):
-            continue
-
-        if (
-            original_count == 0
-            and expanded_count < 2
-        ):
-            continue
-
-        results.append({
-            "name": document["name"],
-            "path": document["path"],
-            "type": "file",
-            "score": score,
-            "matched": original_count,
-            "expanded": expanded_count
-        })
-
-    results.sort(
+    text_results.sort(
         key=lambda item: (
             item["score"],
             item["matched"],
@@ -811,15 +975,158 @@ def search_document_contents(
         reverse=True
     )
 
-    if not results:
+    if text_results:
+
+        best_score = text_results[0]["score"]
+
+        strong_results = [
+            result
+            for result in text_results
+            if result["score"]
+            >= best_score * 0.35
+        ]
+
+        return [
+            {
+                "name": result["name"],
+                "path": result["path"],
+                "type": result["type"]
+            }
+            for result in strong_results[:limit]
+        ]
+
+    if not scanned_documents:
         return []
 
-    best_score = results[0]["score"]
+    # OCR only a limited number of promising scanned PDFs.
+    scanned_documents.sort(
+        key=lambda document: (
+            score_filename(
+                document["name"],
+                useful_words
+            ),
+            document["modified"],
+            -document["size"]
+        ),
+        reverse=True
+    )
+
+    ocr_candidates = scanned_documents[
+        :MAX_OCR_CANDIDATES
+    ]
+
+    ocr_results = []
+
+    for document in ocr_candidates:
+
+        file_path = document["path"]
+        modified = document["modified"]
+
+        cached = index.get(
+            file_path
+        )
+
+        content = ""
+
+        if (
+            cached
+            and cached.get("modified") == modified
+            and cached.get("ocr") is True
+            and cached.get("content")
+        ):
+
+            content = cached.get(
+                "content",
+                ""
+            )
+
+        else:
+
+            content = ocr_pdf(
+                file_path
+            )
+
+            index[file_path] = {
+                "modified": modified,
+                "content": content,
+                "ocr": True
+            }
+
+            changed_index = True
+
+        if not content:
+            continue
+
+        scored = score_content(
+            content,
+            document["name"],
+            useful_words,
+            expanded_words
+        )
+
+        if (
+            scored["matched"] == 0
+            and scored["expanded"] < 2
+        ):
+            continue
+
+        ocr_results.append({
+            "name": document["name"],
+            "path": document["path"],
+            "type": "file",
+            "score": scored["score"],
+            "matched": scored["matched"],
+            "expanded": scored["expanded"]
+        })
+
+        # Stop immediately on a very strong OCR match.
+        if (
+            "spiderman" in useful_words
+            and "spiderman" in normalize_text(content)
+        ):
+            break
+
+        if (
+            "voe" in useful_words
+            and "voe" in normalize_text(content)
+        ):
+            break
+
+        if (
+            "eduww" in normalize_text(content)
+            and (
+                "school" in useful_words
+                or "education" in useful_words
+                or "enrollment" in useful_words
+            )
+        ):
+            break
+
+    if changed_index:
+        save_index(
+            folder_path,
+            index
+        )
+
+    ocr_results.sort(
+        key=lambda item: (
+            item["score"],
+            item["matched"],
+            item["expanded"]
+        ),
+        reverse=True
+    )
+
+    if not ocr_results:
+        return []
+
+    best_score = ocr_results[0]["score"]
 
     strong_results = [
         result
-        for result in results
-        if result["score"] >= best_score * 0.35
+        for result in ocr_results
+        if result["score"]
+        >= best_score * 0.35
     ]
 
     return [
@@ -837,59 +1144,9 @@ def get_candidate_files(
     query,
     limit=8
 ):
-    query_words = re.findall(
-        r"[a-zA-Z0-9]+",
-        query.lower()
+    useful_words = build_query_words(
+        query
     )
-
-    ignored_words = {
-        "find",
-        "show",
-        "get",
-        "look",
-        "search",
-        "for",
-        "the",
-        "a",
-        "an",
-        "my",
-        "me",
-        "file",
-        "files",
-        "folder",
-        "folders",
-        "thing",
-        "something",
-        "that",
-        "where",
-        "about",
-        "with",
-        "which",
-        "document",
-        "whatever",
-        "called",
-        "named",
-        "please",
-        "some",
-        "one",
-        "is",
-        "are",
-        "was",
-        "were",
-        "and",
-        "or",
-        "to",
-        "in",
-        "of",
-        "on"
-    }
-
-    useful_words = [
-        word
-        for word in query_words
-        if word not in ignored_words
-        and len(word) >= 3
-    ]
 
     scored = []
 

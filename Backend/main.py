@@ -113,9 +113,7 @@ def scan(request: FolderRequest):
 
 
 @app.post("/command")
-def command(
-    request: CommandRequest
-):
+def command(request: CommandRequest):
     try:
         memory = get_chat_memory(
             request.chat_id
@@ -124,11 +122,6 @@ def command(
         conversation = get_conversation(
             memory
         )
-
-        previous_user_message = {
-            "role": "user",
-            "content": request.command
-        }
 
         action = understand_command(
             request.command,
@@ -167,7 +160,6 @@ def command(
             memory
         )
 
-
         if action_type == "CHAT":
 
             answer = generate_chat_response(
@@ -188,7 +180,6 @@ def command(
                 "query": query,
                 "answer": answer
             }
-
 
         if action_type == "QUESTION":
 
@@ -284,7 +275,6 @@ def command(
                     "path": best_file["path"]
                 }
             }
-
 
         if action_type == "SEARCH":
 
@@ -406,7 +396,6 @@ def command(
                 "query": query,
                 "results": []
             }
-
 
         answer = (
             "I'm not sure what you want me "
